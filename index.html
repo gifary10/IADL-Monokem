@@ -255,11 +255,9 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 .nav-brand-icon {
   width: 36px; height: 36px;
-  background: linear-gradient(135deg, var(--clr-accent), #14b8a6);
   border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: white;
-  box-shadow: 0 4px 6px -2px rgba(13,148,136,0.2);
 }
 .nav-brand-name {
   font-family: 'Roboto', sans-serif;
@@ -626,6 +624,41 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 /* ═══════════════════════════════════════════════════
    MISC
 ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   TABLE — FLOATING ACTION COLUMN
+═══════════════════════════════════════════════════ */
+.data-table thead th:last-child,
+.data-table tbody td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background: var(--clr-surface);
+  box-shadow: -3px 0 8px -2px rgba(0,0,0,0.06);
+}
+.data-table thead th:last-child {
+  background: #f8fafc;
+  z-index: 3;
+}
+.data-table tbody tr:hover td:last-child {
+  background: #fafafa;
+}
+.action-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.btn-edit-soft,
+.btn-danger-soft {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
 .text-accent { color: var(--clr-accent) !important; }
 .text-muted-custom { color: var(--clr-muted) !important; }
 hr.dark { border-color: var(--clr-border); opacity: 1; }
@@ -823,16 +856,25 @@ hr.dark { border-color: var(--clr-border); opacity: 1; }
 
     <div class="mb-3">
       <label class="form-label">Departemen</label>
-      <select id="loginDept" class="form-select">
-        <option value="">— Pilih Departemen —</option>
-      </select>
+      <div style="position:relative">
+        <select id="loginDept" class="form-select" style="padding-right:40px">
+          <option value="">— Pilih Departemen —</option>
+        </select>
+        <div id="deptSpinner" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%)">
+          <div style="width:16px;height:16px;border:2px solid var(--clr-border);border-top-color:var(--clr-accent);border-radius:50%;animation:spin 0.7s linear infinite"></div>
+        </div>
+      </div>
     </div>
     <div class="mb-4">
       <label class="form-label">Kode Akses</label>
       <input type="password" id="loginCode" class="form-control" placeholder="Masukkan kode akses..." autocomplete="off" />
     </div>
-    <button class="btn-accent w-100" onclick="doLogin()">
-      <i class="bi bi-box-arrow-in-right me-2"></i>Masuk
+    <button class="btn-accent w-100" id="btnLogin" onclick="doLogin()">
+      <span id="btnLoginContent"><i class="bi bi-box-arrow-in-right me-2"></i>Masuk</span>
+      <span id="btnLoginSpinner" style="display:none;justify-content:center;align-items:center;gap:8px">
+        <div style="width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;flex-shrink:0"></div>
+        Memverifikasi...
+      </span>
     </button>
     <p id="loginError" class="text-danger mt-3 text-center" style="font-size:13px;display:none;"></p>
   </div>
@@ -1306,7 +1348,11 @@ function toast(msg, type = 'success') {
 // LOGIN
 // ════════════════════════════════════════════════════════
 async function initLogin() {
-  showLoading('Memuat daftar departemen...');
+  // Show dept spinner
+  const deptSpinner = document.getElementById('deptSpinner');
+  const loginDept   = document.getElementById('loginDept');
+  if (deptSpinner) deptSpinner.style.display = 'block';
+  if (loginDept)   loginDept.disabled = true;
   try {
     const res = await gasRequest('getDepts');
     if (res.ok) {
@@ -1319,7 +1365,8 @@ async function initLogin() {
       });
     }
   } catch (e) { console.warn('Offline mode or GAS URL not set.'); }
-  hideLoading();
+  if (deptSpinner) deptSpinner.style.display = 'none';
+  if (loginDept)   loginDept.disabled = false;
 
   // Check localStorage session
   const saved = localStorage.getItem('iadl_dept');
@@ -1338,10 +1385,16 @@ async function doLogin() {
   if (!code) { errEl.textContent = 'Masukkan kode akses.'; errEl.style.display = 'block'; return; }
   errEl.style.display = 'none';
 
-  showLoading('Memverifikasi akses...');
+  // Show button spinner
+  const btnLogin   = document.getElementById('btnLogin');
+  const btnContent = document.getElementById('btnLoginContent');
+  const btnSpinner = document.getElementById('btnLoginSpinner');
+  btnLogin.disabled = true;
+  btnContent.style.display = 'none';
+  btnSpinner.style.display = 'flex';
+
   try {
     const res = await gasRequest('login', { dept, code });
-    hideLoading();
     if (res.ok) {
       STATE.dept = dept;
       localStorage.setItem('iadl_dept', dept);
@@ -1351,10 +1404,14 @@ async function doLogin() {
       errEl.style.display = 'block';
     }
   } catch (e) {
-    hideLoading();
     errEl.textContent = 'Tidak dapat terhubung ke server.';
     errEl.style.display = 'block';
   }
+
+  // Restore button
+  btnLogin.disabled = false;
+  btnContent.style.display = '';
+  btnSpinner.style.display = 'none';
 }
 
 function enterApp() {
@@ -1493,16 +1550,31 @@ function editRecord(idx) {
   document.getElementById('f_noHazard').value      = rec['No Hazard'] || '';
   document.getElementById('f_aktifitas').value     = rec['Aktifitas'] || '';
   document.getElementById('f_lokasi').value        = rec['Lokasi'] || '';
-  document.getElementById('f_kondisi').value       = rec['Kondisi'] || '';
-  document.getElementById('f_klasifikasi').value   = rec['Klasifikasi Resiko'] || '';
   document.getElementById('f_descHazard').value    = rec['Deskripsi Hazard'] || '';
   document.getElementById('f_dampak').value        = rec['Dampak'] || '';
-  document.getElementById('f_prob').value          = rec['Nilai Probabilitas'] || '';
-  document.getElementById('f_dampakVal').value     = rec['Nilai Dampak'] || '';
-  document.getElementById('f_pengendalian').value  = rec['Pengendalian Risiko'] || '';
   document.getElementById('f_descPengendalian').value = rec['Deskripsi Pengendalian'] || '';
-  document.getElementById('f_ctrlProb').value      = rec['Nilai Pengendalian Probabilitas'] || '';
-  document.getElementById('f_ctrlDampak').value    = rec['Nilai Penilaian Dampak'] || '';
+
+  // Select fields — set value then trigger hint panels
+  const setSelect = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val || '';
+  };
+  setSelect('f_kondisi',      rec['Kondisi']);
+  setSelect('f_klasifikasi',  rec['Klasifikasi Resiko']);
+  setSelect('f_prob',         rec['Nilai Probabilitas']);
+  setSelect('f_dampakVal',    rec['Nilai Dampak']);
+  setSelect('f_pengendalian', rec['Pengendalian Risiko']);
+  setSelect('f_ctrlProb',     rec['Nilai Pengendalian Probabilitas']);
+  setSelect('f_ctrlDampak',   rec['Nilai Penilaian Dampak']);
+
+  // Trigger hint panels for all select fields
+  showSelectHint('kondisi_val',      rec['Kondisi'] || '');
+  showSelectHint('klasifikasi_val',  rec['Klasifikasi Resiko'] || '');
+  showSelectHint('prob_val',         rec['Nilai Probabilitas'] || '');
+  showSelectHint('dampak_val',       rec['Nilai Dampak'] || '');
+  showSelectHint('pengendalian_val', rec['Pengendalian Risiko'] || '');
+  showSelectHint('ctrl_prob_val',    rec['Nilai Pengendalian Probabilitas'] || '');
+  showSelectHint('ctrl_dampak_val',  rec['Nilai Penilaian Dampak'] || '');
 
   calcRisk();
   calcRiskAfter();
@@ -1595,7 +1667,7 @@ function renderTable() {
       <td>${riskBadge(r['Risiko Setelah Pengendalian'])}</td>
       <td style="font-size:11px;color:var(--clr-muted);white-space:nowrap">${ts}</td>
       <td>
-        <div class="d-flex gap-1">
+        <div class="action-btns">
           <button class="btn-edit-soft" onclick="editRecord(${origIdx})" title="Edit"><i class="bi bi-pencil"></i></button>
           <button class="btn-danger-soft" onclick="deleteRecord(${origIdx})" title="Hapus"><i class="bi bi-trash3"></i></button>
         </div>
