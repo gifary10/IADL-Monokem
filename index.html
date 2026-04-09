@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IADL Monokem — Identifikasi Aspek Dampak Lingkungan</title>
+
+<!-- Bootstrap 5 -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<!-- Bootstrap Icons -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ═══════════════════════════════════════════════════
+   DESIGN TOKENS (LIGHT MODE • FRESH & CLEAN)
+═══════════════════════════════════════════════════ */
+:root {
+  --clr-bg:       #f8fafc;
+  --clr-surface:  #ffffff;
+  --clr-card:     #ffffff;
+  --clr-border:   #e2e8f0;
+  --clr-border2:  #cbd5e1;
+
+  --clr-accent:   #0d9488;
+  --clr-accent2:  #3b82f6;
+  --clr-amber:    #f59e0b;
+  --clr-red:      #ef4444;
+  --clr-green:    #10b981;
+
+  --clr-text:     #0f172a;
+  --clr-muted:    #64748b;
+  --clr-subtle:   #475569;
+
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  --shadow-glow: 0 8px 24px -8px rgba(13, 148, 136, 0.15);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* ═══════════════════════════════════════════════════
+   BASE
+═══════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Noise texture overlay — dihilangkan untuk clean look */
+
+/* ═══════════════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════════════ */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 20px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 20px; border: 2px solid #f1f5f9; }
+::-webkit-scrollbar-thumb:hover { background: var(--clr-accent); }
+
+/* ═══════════════════════════════════════════════════
+   TYPOGRAPHY
+═══════════════════════════════════════════════════ */
+.font-syne { font-family: 'Roboto', sans-serif; }
+.font-mono { font-family: 'Roboto', monospace; }
+
+/* ═══════════════════════════════════════════════════
+   LOGIN MODAL OVERLAY
+═══════════════════════════════════════════════════ */
+#loginOverlay {
+  position: fixed; inset: 0;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.3s ease;
+}
+#loginOverlay.fade-out { opacity: 0; pointer-events: none; }
+
+.login-box {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  padding: 48px 40px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: var(--shadow-card), 0 20px 35px -10px rgba(0,0,0,0.05);
+  position: relative;
+  overflow: hidden;
+}
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(13,148,136,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-logo {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px;
+}
+.login-logo-icon {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--clr-accent), #14b8a6);
+  border-radius: var(--radius-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: white;
+  box-shadow: 0 6px 10px -4px rgba(13,148,136,0.2);
+}
+.login-logo-text {
+  font-family: 'Roboto', sans-serif;
+  font-size: 24px; font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--clr-text);
+}
+.login-logo-text span { color: var(--clr-accent); }
+
+.login-subtitle {
+  color: var(--clr-muted);
+  font-size: 13px;
+  margin-bottom: 36px;
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════════
+   FORM CONTROLS (shared)
+═══════════════════════════════════════════════════ */
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--clr-muted);
+  margin-bottom: 6px;
+}
+
+.form-control, .form-select {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  padding: 10px 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.form-control:focus, .form-select:focus {
+  background: var(--clr-surface);
+  color: var(--clr-text);
+  border-color: var(--clr-accent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+  outline: none;
+}
+.form-control::placeholder { color: #94a3b8; }
+.form-select option { background: white; color: var(--clr-text); }
+
+textarea.form-control { resize: vertical; min-height: 80px; }
+
+/* Read-only computed fields */
+.form-control[readonly] {
+  background: #f1f5f9;
+  border-color: var(--clr-border);
+  color: var(--clr-accent);
+  font-family: 'Roboto', monospace;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════
+   BUTTONS
+═══════════════════════════════════════════════════ */
+.btn-accent {
+  background: var(--clr-accent);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 24px;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  cursor: pointer;
+  box-shadow: 0 4px 8px -4px rgba(13, 148, 136, 0.25);
+}
+.btn-accent:hover { background: #0f766e; transform: translateY(-1px); box-shadow: 0 8px 14px -6px rgba(13, 148, 136, 0.3); color: white; }
+.btn-accent:active { transform: translateY(0); box-shadow: none; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--clr-muted);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--clr-accent); color: var(--clr-accent); background: #f0fdfa; }
+
+.btn-danger-soft {
+  background: #fef2f2;
+  color: var(--clr-red);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-danger-soft:hover { background: #fee2e2; }
+
+.btn-edit-soft {
+  background: #eff6ff;
+  color: var(--clr-accent2);
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+.btn-edit-soft:hover { background: #dbeafe; }
+
+/* ═══════════════════════════════════════════════════
+   NAVBAR
+═══════════════════════════════════════════════════ */
+#appNav {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--clr-border);
+  position: sticky; top: 0;
+  z-index: 100;
+  padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px;
+}
+
+.nav-brand {
+  display: flex; align-items: center; gap: 12px;
+  text-decoration: none;
+}
+
+.nav-logo {
+  height: 32px; /* sesuaikan kebutuhan */
+  width: auto;
+}
+.nav-brand-icon {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--clr-accent), #14b8a6);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: white;
+  box-shadow: 0 4px 6px -2px rgba(13,148,136,0.2);
+}
+.nav-brand-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--clr-text);
+  letter-spacing: -0.3px;
+}
+.nav-brand-name span { color: var(--clr-accent); }
+
+.nav-dept-badge {
+  background: #f0fdfa;
+  border: 1px solid #ccfbf1;
+  color: var(--clr-accent);
+  border-radius: 30px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.nav-actions { display: flex; align-items: center; gap: 12px; }
+
+/* ═══════════════════════════════════════════════════
+   MAIN LAYOUT
+═══════════════════════════════════════════════════ */
+#appMain {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 32px 28px 60px;
+}
+
+/* ═══════════════════════════════════════════════════
+   PAGE HEADER
+═══════════════════════════════════════════════════ */
+.page-header {
+  margin-bottom: 32px;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 20px;
+}
+.page-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 32px; font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: #0f172a;
+}
+.page-title span { 
+  background: linear-gradient(135deg, var(--clr-accent), var(--clr-accent2));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.page-desc { color: var(--clr-muted); font-size: 14px; margin-top: 4px; }
+
+/* ═══════════════════════════════════════════════════
+   STAT CARDS
+═══════════════════════════════════════════════════ */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px; margin-bottom: 36px; }
+
+.stat-card {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.2s, border-color 0.2s;
+  box-shadow: var(--shadow-card);
+}
+.stat-card:hover { border-color: #cbd5e1; box-shadow: 0 8px 20px -8px rgba(0,0,0,0.08); }
+.stat-card::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.stat-card.extreme::after { background: var(--clr-red); }
+.stat-card.high::after    { background: var(--clr-amber); }
+.stat-card.medium::after  { background: var(--clr-accent2); }
+.stat-card.low::after     { background: var(--clr-green); }
+.stat-card.total::after   { background: linear-gradient(90deg, var(--clr-accent), var(--clr-accent2)); }
+
+.stat-value {
+  font-family: 'Roboto', monospace;
+  font-size: 36px; font-weight: 600;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+.stat-card.extreme .stat-value { color: var(--clr-red); }
+.stat-card.high .stat-value    { color: var(--clr-amber); }
+.stat-card.medium .stat-value  { color: var(--clr-accent2); }
+.stat-card.low .stat-value     { color: var(--clr-green); }
+.stat-card.total .stat-value   { color: var(--clr-accent); }
+
+.stat-label { font-size: 13px; color: var(--clr-muted); font-weight: 500; letter-spacing: 0.03em; }
+
+/* ═══════════════════════════════════════════════════
+   SECTION CARD
+═══════════════════════════════════════════════════ */
+.section-card {
+  background: var(--clr-card);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 28px;
+  box-shadow: var(--shadow-card);
+}
+
+.section-card-header {
+  background: #fafafa;
+  border-bottom: 1px solid var(--clr-border);
+  padding: 18px 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+
+.section-card-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px; font-weight: 700;
+  display: flex; align-items: center; gap: 10px;
+  color: #1e293b;
+}
+.section-card-title i {
+  color: var(--clr-accent);
+  font-size: 18px;
+}
+
+.section-divider {
+  height: 1px;
+  background: var(--clr-border);
+  margin: 12px 0 24px;
+}
+
+/* form section labels */
+.form-section-label {
+  font-family: 'Roboto', sans-serif;
+  font-size: 12px; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--clr-accent);
+  padding: 6px 12px;
+  background: #f0fdfa;
+  border-left: 3px solid var(--clr-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* ═══════════════════════════════════════════════════
+   TABLE
+═══════════════════════════════════════════════════ */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.data-table thead tr {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--clr-border2);
+}
+.data-table thead th {
+  padding: 14px 18px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--clr-muted);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+}
+.data-table tbody tr:hover { background: #fafafa; }
+
+.data-table tbody td {
+  padding: 14px 18px;
+  color: var(--clr-subtle);
+  vertical-align: middle;
+}
+.data-table tbody td.bold-cell {
+  color: var(--clr-text);
+  font-weight: 600;
+}
+
+/* Risk badges */
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 12px; font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.risk-extreme { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+.risk-high    { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+.risk-medium  { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.risk-low     { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+
+.no-hazard-code {
+  font-family: 'Roboto', monospace;
+  font-size: 12px;
+  color: var(--clr-accent);
+  background: #f0fdfa;
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 64px 24px;
+  color: var(--clr-muted);
+}
+.empty-state i { font-size: 44px; display: block; margin-bottom: 14px; opacity: 0.5; }
+.empty-state p { font-size: 15px; }
+
+/* ═══════════════════════════════════════════════════
+   TOAST NOTIFICATION
+═══════════════════════════════════════════════════ */
+#toastContainer {
+  position: fixed; bottom: 28px; right: 28px;
+  z-index: 9998;
+  display: flex; flex-direction: column; gap: 12px;
+  pointer-events: none;
+}
+
+.toast-msg {
+  background: white;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  display: flex; align-items: center; gap: 14px;
+  min-width: 300px;
+  box-shadow: 0 10px 30px -8px rgba(0,0,0,0.1);
+  pointer-events: all;
+  animation: toastIn 0.25s ease forwards;
+}
+.toast-msg.error { border-left: 4px solid var(--clr-red); }
+.toast-msg.success { border-left: 4px solid var(--clr-accent); }
+.toast-msg .toast-icon { font-size: 20px; }
+.toast-msg.success .toast-icon { color: var(--clr-accent); }
+.toast-msg.error   .toast-icon { color: var(--clr-red); }
+.toast-msg .toast-text { font-size: 14px; color: var(--clr-text); flex: 1; font-weight: 500; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ═══════════════════════════════════════════════════
+   LOADING OVERLAY
+═══════════════════════════════════════════════════ */
+#loadingOverlay {
+  position: fixed; inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 8000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+#loadingOverlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+.loading-spinner {
+  width: 44px; height: 44px;
+  border: 3px solid var(--clr-border);
+  border-top-color: var(--clr-accent);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+  color: var(--clr-muted);
+  font-size: 14px;
+  margin-top: 18px;
+  font-family: 'Roboto', monospace;
+  letter-spacing: 0.03em;
+}
+
+/* ═══════════════════════════════════════════════════
+   MODAL (Edit / Delete confirm)
+═══════════════════════════════════════════════════ */
+.modal-dark .modal-content {
+  background: white;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+}
+.modal-dark .modal-header {
+  border-bottom: 1px solid var(--clr-border);
+  padding: 22px 28px;
+}
+.modal-dark .modal-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px; font-weight: 700;
+}
+.modal-dark .modal-footer { border-top: 1px solid var(--clr-border); padding: 18px 28px; }
+.modal-dark .btn-close { filter: invert(0.4); opacity: 0.6; }
+.modal-backdrop.show { opacity: 0.4 !important; }
+
+/* ═══════════════════════════════════════════════════
+   SEARCH & FILTER BAR
+═══════════════════════════════════════════════════ */
+.filter-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--clr-border);
+}
+.filter-bar .form-control, .filter-bar .form-select {
+  height: 40px; padding: 6px 14px;
+  font-size: 14px;
+}
+.search-input-wrap {
+  position: relative; flex: 1; min-width: 220px;
+}
+.search-input-wrap i {
+  position: absolute; left: 13px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--clr-muted); font-size: 15px;
+}
+.search-input-wrap .form-control { padding-left: 40px; }
+
+/* ═══════════════════════════════════════════════════
+   COLLAPSIBLE FORM SECTION
+═══════════════════════════════════════════════════ */
+#formCollapse { padding: 28px; }
+
+/* PxD live preview */
+.pxd-preview {
+  display: flex; align-items: center; gap: 14px;
+  margin-top: 10px;
+}
+.pxd-value {
+  font-family: 'Roboto', monospace;
+  font-size: 24px; font-weight: 600;
+  color: var(--clr-accent);
+}
+.pxd-arrow { color: var(--clr-muted); font-size: 20px; }
+.pxd-after { color: var(--clr-accent2); }
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  #appNav { padding: 0 16px; }
+  #appMain { padding: 20px 16px 60px; }
+  .login-box { padding: 32px 24px; margin: 16px; }
+  .page-title { font-size: 26px; }
+  .stats-row { grid-template-columns: repeat(3, 1fr); }
+  .section-card-header { padding: 16px 20px; }
+  #formCollapse { padding: 20px; }
+}
+
+/* ═══════════════════════════════════════════════════
+   MISC
+═══════════════════════════════════════════════════ */
+.text-accent { color: var(--clr-accent) !important; }
+.text-muted-custom { color: var(--clr-muted) !important; }
+hr.dark { border-color: var(--clr-border); opacity: 1; }
+
+/* Collapse toggle arrow */
+.collapse-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(180deg); }
+.toggle-icon { transition: transform 0.25s; display: inline-block; }
+
+/* ═══════════════════════════════════════════════════
+   HINT / TOOLTIP SYSTEM (Light & clean)
+═══════════════════════════════════════════════════ */
+.hint-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: var(--clr-accent2);
+  border-radius: 50%;
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 6px;
+  vertical-align: middle;
+  transition: background 0.2s, transform 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  top: -1px;
+}
+.hint-icon:hover {
+  background: #dbeafe;
+  transform: scale(1.15);
+}
+
+.hint-tooltip {
+  position: absolute;
+  z-index: 4000;
+  width: 320px;
+  background: white;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 35px -10px rgba(0,0,0,0.1);
+  padding: 0;
+  overflow: hidden;
+  animation: tooltipIn 0.18s ease forwards;
+  pointer-events: none;
+}
+@keyframes tooltipIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.hint-tooltip.visible { pointer-events: all; }
+
+.ht-header {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--clr-border);
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ht-header-icon { color: var(--clr-accent2); font-size: 15px; }
+.ht-header-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px; font-weight: 700;
+  color: var(--clr-text);
+  letter-spacing: 0.02em;
+}
+.ht-body { padding: 14px 16px; }
+.ht-desc {
+  font-size: 13px; color: var(--clr-subtle);
+  line-height: 1.6; margin-bottom: 12px;
+}
+.ht-desc:last-child { margin-bottom: 0; }
+
+.ht-options { display: flex; flex-direction: column; gap: 8px; }
+.ht-option {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 8px 12px;
+  background: #fafafa;
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+.ht-option:hover { background: #f0fdfa; border-color: #ccfbf1; }
+.ht-opt-badge {
+  flex-shrink: 0;
+  min-width: 26px; height: 26px;
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Roboto', monospace;
+  font-size: 12px; font-weight: 700;
+  background: white;
+}
+.ht-opt-text { font-size: 13px; color: var(--clr-subtle); line-height: 1.5; }
+.ht-opt-name { font-weight: 600; color: var(--clr-text); display: block; font-size: 13px; }
+
+.ht-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 12.5px;
+}
+.ht-table th {
+  background: #f1f5f9;
+  padding: 8px 10px;
+  color: var(--clr-muted);
+  font-weight: 700; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  border-bottom: 1px solid var(--clr-border);
+}
+.ht-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--clr-subtle);
+  vertical-align: top;
+}
+.ht-table tr:last-child td { border-bottom: none; }
+.ht-table .score-cell {
+  font-family: 'Roboto', monospace;
+  font-weight: 600;
+  color: var(--clr-accent);
+  text-align: center;
+  width: 40px;
+}
+
+.ht-example {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f0fdfa;
+  border-left: 3px solid var(--clr-accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 12.5px;
+  color: var(--clr-muted);
+}
+.ht-example strong { color: var(--clr-accent); }
+
+.hint-panel {
+  margin-top: 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--clr-border);
+  animation: tooltipIn 0.2s ease;
+  background: white;
+}
+.hint-panel-inner {
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--clr-subtle);
+}
+.hint-panel-title {
+  font-weight: 700;
+  font-size: 12.5px;
+  margin-bottom: 5px;
+  display: flex; align-items: center; gap: 8px;
+  color: #1e293b;
+}
+
+.risk-matrix {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.rm-cell {
+  padding: 8px 4px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 0.02em;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.ht-formula {
+  font-family: 'Roboto', monospace;
+  font-size: 13px;
+  color: var(--clr-accent);
+  background: #f0fdfa;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  margin: 8px 0;
+  display: block;
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     LOGIN OVERLAY
+════════════════════════════════════════════════ -->
+<div id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon"><i class="bi bi-shield-check"></i></div>
+      <div class="login-logo-text">IADL <span>Monokem</span></div>
+    </div>
+    <p class="login-subtitle">Identifikasi Aspek Dampak Lingkungan &amp; Kendali Risiko<br>Silakan pilih departemen dan masukkan kode akses.</p>
+
+    <div class="mb-3">
+      <label class="form-label">Departemen</label>
+      <select id="loginDept" class="form-select">
+        <option value="">— Pilih Departemen —</option>
+      </select>
+    </div>
+    <div class="mb-4">
+      <label class="form-label">Kode Akses</label>
+      <input type="password" id="loginCode" class="form-control" placeholder="Masukkan kode akses..." autocomplete="off" />
+    </div>
+    <button class="btn-accent w-100" onclick="doLogin()">
+      <i class="bi bi-box-arrow-in-right me-2"></i>Masuk
+    </button>
+    <p id="loginError" class="text-danger mt-3 text-center" style="font-size:13px;display:none;"></p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     LOADING OVERLAY
+════════════════════════════════════════════════ -->
+<div id="loadingOverlay">
+  <div class="text-center">
+    <div class="loading-spinner mx-auto"></div>
+    <div class="loading-text mt-3" id="loadingText">Memuat data...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     TOAST CONTAINER
+════════════════════════════════════════════════ -->
+<div id="toastContainer"></div>
+
+<!-- HINT TOOLTIP PORTAL -->
+<div id="hintTooltip" class="hint-tooltip" style="display:none"></div>
+
+<!-- ═══════════════════════════════════════════════
+     NAVBAR
+════════════════════════════════════════════════ -->
+<nav id="appNav" style="display:none">
+  <a class="nav-brand" href="#">
+    <div class="nav-brand-icon">
+  <img src="logo.png" alt="Logo" class="nav-logo">
+</div>
+    <span class="nav-brand-name">IADL <span>Monokem</span></span>
+  </a>
+  <div class="d-flex align-items-center gap-2">
+    <span id="navDeptBadge" class="nav-dept-badge"><i class="bi bi-building me-1"></i><span id="navDeptName">—</span></span>
+    <div class="nav-actions">
+      <button class="btn-ghost d-none d-md-inline-flex align-items-center gap-1" onclick="loadRecords()">
+        <i class="bi bi-arrow-clockwise"></i>
+      </button>
+      <button class="btn-ghost" onclick="doLogout()">
+        <i class="bi bi-box-arrow-right me-1"></i><span class="d-none d-sm-inline">Keluar</span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN APP
+════════════════════════════════════════════════ -->
+<main id="appMain" style="display:none">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1 class="page-title"><span>Identifikasi</span> Aspek Dampak Lingkungan</h1>
+      <p class="page-desc">Kelola data hazard, penilaian risiko, dan pengendalian bahaya lingkungan.</p>
+    </div>
+    <button class="btn-accent" data-bs-toggle="collapse" data-bs-target="#formCollapse" aria-expanded="false" id="toggleFormBtn">
+      <i class="bi bi-plus-lg me-1"></i> Input Data Baru
+    </button>
+  </div>
+
+  <!-- Stat Cards -->
+  <div class="stats-row" id="statsRow">
+    <div class="stat-card total"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Data</div></div>
+    <div class="stat-card extreme"><div class="stat-value" id="statExtreme">0</div><div class="stat-label">Extreme</div></div>
+    <div class="stat-card high"><div class="stat-value" id="statHigh">0</div><div class="stat-label">High</div></div>
+    <div class="stat-card medium"><div class="stat-value" id="statMedium">0</div><div class="stat-label">Medium</div></div>
+    <div class="stat-card low"><div class="stat-value" id="statLow">0</div><div class="stat-label">Low</div></div>
+  </div>
+
+  <!-- Input Form -->
+  <div class="section-card">
+    <div class="section-card-header collapse-toggle" data-bs-toggle="collapse" data-bs-target="#formCollapse" style="cursor:pointer">
+      <span class="section-card-title">
+        <i class="bi bi-pencil-square"></i> Form Input / Edit Data
+      </span>
+      <i class="bi bi-chevron-down toggle-icon text-muted-custom"></i>
+    </div>
+    <div class="collapse" id="formCollapse">
+      <form id="dataForm" onsubmit="submitForm(event)">
+        <input type="hidden" id="f_row" />
+
+        <!-- ── SECTION: Informasi Umum ── -->
+        <div class="form-section-label"><i class="bi bi-info-circle"></i> Informasi Umum</div>
+        <div class="row g-3 mb-4">
+
+          <!-- No Hazard -->
+          <div class="col-md-2">
+            <label class="form-label">
+              No Hazard
+              <span class="hint-icon" data-hint="no_hazard"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_noHazard" class="form-control" readonly placeholder="Auto..." />
+            <div class="form-text" style="font-size:11px;color:var(--clr-muted);margin-top:4px"><i class="bi bi-magic me-1"></i>Generate otomatis</div>
+          </div>
+
+          <!-- Aktifitas -->
+          <div class="col-md-4">
+            <label class="form-label">
+              Aktifitas <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="aktifitas"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_aktifitas" class="form-control" placeholder="Contoh: Pengisian bahan bakar genset..." required />
+          </div>
+
+          <!-- Lokasi -->
+          <div class="col-md-3">
+            <label class="form-label">
+              Lokasi <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="lokasi"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_lokasi" class="form-control" placeholder="Contoh: Area Gudang B, Lantai 2..." required />
+          </div>
+
+          <!-- Kondisi -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Kondisi <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="kondisi"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_kondisi" class="form-select" onchange="showSelectHint('kondisi_val', this.value)" required>
+              <option value="">Pilih Kondisi</option>
+              <option>Normal</option>
+              <option>Abnormal</option>
+              <option>Emergency</option>
+            </select>
+            <div id="kondisi_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- Klasifikasi Risiko -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Klasifikasi Risiko <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="klasifikasi"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_klasifikasi" class="form-select" onchange="showSelectHint('klasifikasi_val', this.value)" required>
+              <option value="">Pilih Klasifikasi</option>
+              <option>Ekstrim</option>
+              <option>Tinggi</option>
+              <option>Sedang</option>
+              <option>Rendah</option>
+            </select>
+            <div id="klasifikasi_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+        </div>
+
+        <!-- ── SECTION: Penilaian Bahaya ── -->
+        <div class="form-section-label"><i class="bi bi-exclamation-triangle"></i> Penilaian Bahaya</div>
+        <div class="row g-3 mb-4">
+
+          <!-- Deskripsi Hazard -->
+          <div class="col-md-6">
+            <label class="form-label">
+              Deskripsi Hazard <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="desc_hazard"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <textarea id="f_descHazard" class="form-control" placeholder="Uraikan kondisi atau tindakan berbahaya yang berpotensi menimbulkan dampak lingkungan..." required></textarea>
+          </div>
+
+          <!-- Dampak -->
+          <div class="col-md-6">
+            <label class="form-label">
+              Dampak <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="dampak_desc"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <textarea id="f_dampak" class="form-control" placeholder="Uraikan dampak negatif terhadap lingkungan yang mungkin terjadi..." required></textarea>
+          </div>
+
+          <!-- Nilai Probabilitas -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Nilai Probabilitas <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="probabilitas"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_prob" class="form-select" onchange="calcRisk(); showSelectHint('prob_val', this.value)" required>
+              <option value="">— Pilih —</option>
+              <option value="1">1 — Sangat Jarang</option>
+              <option value="2">2 — Jarang</option>
+              <option value="3">3 — Kadang-kadang</option>
+              <option value="4">4 — Sering</option>
+              <option value="5">5 — Sangat Sering</option>
+              <option value="6">6 — Hampir Pasti</option>
+            </select>
+            <div id="prob_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- Nilai Dampak -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Nilai Dampak <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="nilai_dampak"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_dampakVal" class="form-select" onchange="calcRisk(); showSelectHint('dampak_val', this.value)" required>
+              <option value="">— Pilih —</option>
+              <option value="1">1 — Tidak Signifikan</option>
+              <option value="2">2 — Minor</option>
+              <option value="3">3 — Sedang</option>
+              <option value="4">4 — Mayor</option>
+              <option value="5">5 — Katastrofik</option>
+            </select>
+            <div id="dampak_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- PxD Awal -->
+          <div class="col-md-3">
+            <label class="form-label">
+              PxD Awal
+              <span class="hint-icon" data-hint="pxd"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_pxdAwal" class="form-control" readonly placeholder="—" />
+            <div class="form-text" style="font-size:11px;color:var(--clr-muted);margin-top:4px"><i class="bi bi-calculator me-1"></i>Probabilitas × Dampak</div>
+          </div>
+
+          <!-- Penilaian Risiko Awal -->
+          <div class="col-md-3">
+            <label class="form-label">
+              Penilaian Risiko Awal
+              <span class="hint-icon" data-hint="risk_level"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_riskAwal" class="form-control" readonly placeholder="—" />
+          </div>
+
+        </div>
+
+        <!-- ── SECTION: Pengendalian Bahaya ── -->
+        <div class="form-section-label"><i class="bi bi-shield-fill-check"></i> Pengendalian Bahaya</div>
+        <div class="row g-3 mb-4">
+
+          <!-- Pengendalian Risiko -->
+          <div class="col-md-4" style="position:relative">
+            <label class="form-label">
+              Pengendalian Risiko <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="pengendalian"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_pengendalian" class="form-select" onchange="showSelectHint('pengendalian_val', this.value)" required>
+              <option value="">— Pilih Metode —</option>
+              <option>Eliminasi</option>
+              <option>Substitusi</option>
+              <option>Rekayasa Teknik</option>
+              <option>Administrasi</option>
+              <option>APD</option>
+            </select>
+            <div id="pengendalian_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- Deskripsi Pengendalian -->
+          <div class="col-md-8">
+            <label class="form-label">
+              Deskripsi Pengendalian <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="desc_pengendalian"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <textarea id="f_descPengendalian" class="form-control" placeholder="Uraikan langkah-langkah tindakan pengendalian yang diterapkan secara spesifik..." required></textarea>
+          </div>
+
+          <!-- Nilai Pengendalian Probabilitas -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Probabilitas Setelah Kendali <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="ctrl_prob"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_ctrlProb" class="form-select" onchange="calcRiskAfter(); showSelectHint('ctrl_prob_val', this.value)" required>
+              <option value="">— Pilih —</option>
+              <option value="1">1 — Sangat Jarang</option>
+              <option value="2">2 — Jarang</option>
+              <option value="3">3 — Kadang-kadang</option>
+              <option value="4">4 — Sering</option>
+              <option value="5">5 — Sangat Sering</option>
+              <option value="6">6 — Hampir Pasti</option>
+            </select>
+            <div id="ctrl_prob_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- Nilai Penilaian Dampak (ctrl) -->
+          <div class="col-md-3" style="position:relative">
+            <label class="form-label">
+              Dampak Setelah Kendali <span class="text-danger">*</span>
+              <span class="hint-icon" data-hint="ctrl_dampak"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <select id="f_ctrlDampak" class="form-select" onchange="calcRiskAfter(); showSelectHint('ctrl_dampak_val', this.value)" required>
+              <option value="">— Pilih —</option>
+              <option value="1">1 — Tidak Signifikan</option>
+              <option value="2">2 — Minor</option>
+              <option value="3">3 — Sedang</option>
+              <option value="4">4 — Mayor</option>
+              <option value="5">5 — Katastrofik</option>
+            </select>
+            <div id="ctrl_dampak_val_hint" class="hint-panel" style="display:none"></div>
+          </div>
+
+          <!-- PxD Akhir -->
+          <div class="col-md-3">
+            <label class="form-label">
+              PxD Akhir
+              <span class="hint-icon" data-hint="pxd_akhir"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_pxdAkhir" class="form-control" readonly placeholder="—" />
+            <div class="form-text" style="font-size:11px;color:var(--clr-muted);margin-top:4px"><i class="bi bi-calculator me-1"></i>Prob. Akhir × Dampak Akhir</div>
+          </div>
+
+          <!-- Risiko Setelah Pengendalian -->
+          <div class="col-md-3">
+            <label class="form-label">
+              Risiko Setelah Pengendalian
+              <span class="hint-icon" data-hint="risk_level"><i class="bi bi-info-lg"></i></span>
+            </label>
+            <input type="text" id="f_riskAkhir" class="form-control" readonly placeholder="—" />
+          </div>
+
+        </div>
+
+        <!-- PxD Summary Preview -->
+        <div class="d-flex align-items-center gap-3 mb-4 px-1 flex-wrap">
+          <div class="text-center">
+            <div class="form-label mb-1">Risiko Awal</div>
+            <div class="pxd-value" id="previewRiskAwal">—</div>
+          </div>
+          <div class="pxd-arrow"><i class="bi bi-arrow-right-circle-fill" style="color:var(--clr-accent);font-size:22px"></i></div>
+          <div class="text-center">
+            <div class="form-label mb-1">Risiko Akhir</div>
+            <div class="pxd-value pxd-after" id="previewRiskAkhir">—</div>
+          </div>
+          <div id="riskReductionBadge" style="display:none" class="ms-2">
+            <span class="risk-badge risk-low" id="riskReductionText"></span>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn-accent">
+            <i class="bi bi-check-lg me-1"></i><span id="btnSubmitLabel">Simpan Data</span>
+          </button>
+          <button type="button" class="btn-ghost" onclick="resetForm()">
+            <i class="bi bi-x-lg me-1"></i>Reset
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Data Table -->
+  <div class="section-card">
+    <div class="section-card-header">
+      <span class="section-card-title"><i class="bi bi-table"></i> Data Identifikasi Risiko</span>
+      <span id="recordCount" class="font-mono text-muted-custom" style="font-size:12px">0 entri</span>
+    </div>
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div class="search-input-wrap">
+        <i class="bi bi-search"></i>
+        <input type="text" id="searchInput" class="form-control" placeholder="Cari aktifitas, hazard, lokasi..." oninput="renderTable()" />
+      </div>
+      <select id="filterRisk" class="form-select" style="max-width:160px" onchange="renderTable()">
+        <option value="">Semua Risiko</option>
+        <option value="Extreme">Extreme</option>
+        <option value="High">High</option>
+        <option value="Medium">Medium</option>
+        <option value="Low">Low</option>
+      </select>
+      <select id="filterKondisi" class="form-select" style="max-width:140px" onchange="renderTable()">
+        <option value="">Semua Kondisi</option>
+        <option>Normal</option>
+        <option>Abnormal</option>
+        <option>Emergency</option>
+      </select>
+    </div>
+    <!-- Table -->
+    <div class="table-wrapper">
+      <table class="data-table" id="dataTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>No Hazard</th>
+            <th>Aktifitas</th>
+            <th>Lokasi</th>
+            <th>Kondisi</th>
+            <th>Deskripsi Hazard</th>
+            <th>PxD Awal</th>
+            <th>Risiko Awal</th>
+            <th>Pengendalian</th>
+            <th>PxD Akhir</th>
+            <th>Risiko Akhir</th>
+            <th>Timestamp</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="13"><div class="empty-state"><i class="bi bi-inbox"></i><p>Belum ada data. Klik "Input Data Baru" untuk memulai.</p></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════
+     DELETE CONFIRM MODAL
+════════════════════════════════════════════════ -->
+<div class="modal fade modal-dark" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-trash3 me-2 text-danger"></i>Konfirmasi Hapus</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p style="color:var(--clr-subtle)">Apakah Anda yakin ingin menghapus data hazard <strong id="deleteHazardNo" style="color:var(--clr-accent)"></strong>?</p>
+        <p class="text-danger mt-2" style="font-size:12px"><i class="bi bi-exclamation-triangle me-1"></i>Tindakan ini tidak dapat dibatalkan.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-bs-dismiss="modal">Batal</button>
+        <button class="btn-danger-soft px-4 py-2" onclick="confirmDelete()" style="font-size:14px">Hapus</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap 5 JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════
+// CONFIG — Ganti URL setelah deploy Google Apps Script
+// ════════════════════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxJNrvW8u3LoymKaGrboTcuS1ys520FuSyNE2qrt3an46pfoGwHs_oKJ31THtmsabwv/exec'; // ← GANTI INI
+
+// ════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════
+let STATE = {
+  dept: null,
+  records: [],
+  deleteRowNum: null,
+  deleteHazardNo: null,
+  editMode: false
+};
+
+// ════════════════════════════════════════════════════════
+// API HELPER
+// ════════════════════════════════════════════════════════
+async function gasRequest(action, body = {}) {
+  const payload = { action, ...body };
+  const res = await fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+// ════════════════════════════════════════════════════════
+// LOADING + TOAST
+// ════════════════════════════════════════════════════════
+function showLoading(text = 'Memuat data...') {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('active');
+}
+
+function toast(msg, type = 'success') {
+  const c = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = `toast-msg ${type}`;
+  el.innerHTML = `<i class="bi ${type === 'success' ? 'bi-check-circle-fill' : 'bi-x-circle-fill'} toast-icon"></i><span class="toast-text">${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(() => { el.style.animation = 'toastIn 0.3s ease reverse forwards'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ════════════════════════════════════════════════════════
+// LOGIN
+// ════════════════════════════════════════════════════════
+async function initLogin() {
+  showLoading('Memuat daftar departemen...');
+  try {
+    const res = await gasRequest('getDepts');
+    if (res.ok) {
+      const sel = document.getElementById('loginDept');
+      res.depts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.name;
+        opt.textContent = d.name;
+        sel.appendChild(opt);
+      });
+    }
+  } catch (e) { console.warn('Offline mode or GAS URL not set.'); }
+  hideLoading();
+
+  // Check localStorage session
+  const saved = localStorage.getItem('iadl_dept');
+  if (saved) {
+    STATE.dept = saved;
+    enterApp();
+  }
+}
+
+async function doLogin() {
+  const dept = document.getElementById('loginDept').value;
+  const code = document.getElementById('loginCode').value.trim();
+  const errEl = document.getElementById('loginError');
+
+  if (!dept) { errEl.textContent = 'Silakan pilih departemen.'; errEl.style.display = 'block'; return; }
+  if (!code) { errEl.textContent = 'Masukkan kode akses.'; errEl.style.display = 'block'; return; }
+  errEl.style.display = 'none';
+
+  showLoading('Memverifikasi akses...');
+  try {
+    const res = await gasRequest('login', { dept, code });
+    hideLoading();
+    if (res.ok) {
+      STATE.dept = dept;
+      localStorage.setItem('iadl_dept', dept);
+      enterApp();
+    } else {
+      errEl.textContent = res.msg || 'Login gagal.';
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    hideLoading();
+    errEl.textContent = 'Tidak dapat terhubung ke server.';
+    errEl.style.display = 'block';
+  }
+}
+
+function enterApp() {
+  const overlay = document.getElementById('loginOverlay');
+  overlay.classList.add('fade-out');
+  setTimeout(() => { overlay.style.display = 'none'; }, 400);
+  document.getElementById('appNav').style.display = 'flex';
+  document.getElementById('appMain').style.display = 'block';
+  document.getElementById('navDeptName').textContent = STATE.dept;
+  loadRecords();
+}
+
+function doLogout() {
+  localStorage.removeItem('iadl_dept');
+  STATE.dept = null;
+  STATE.records = [];
+  location.reload();
+}
+
+// ════════════════════════════════════════════════════════
+// RISK CALCULATION
+// ════════════════════════════════════════════════════════
+function riskLevel(pxd) {
+  const n = Number(pxd);
+  if (n >= 16) return 'Extreme';
+  if (n >= 11) return 'High';
+  if (n >= 6)  return 'Medium';
+  if (n >= 1)  return 'Low';
+  return '—';
+}
+
+function calcRisk() {
+  const p = Number(document.getElementById('f_prob').value);
+  const d = Number(document.getElementById('f_dampakVal').value);
+  const pxd = (p && d) ? p * d : '';
+  document.getElementById('f_pxdAwal').value = pxd || '';
+  const level = pxd ? riskLevel(pxd) : '—';
+  document.getElementById('f_riskAwal').value = level;
+  document.getElementById('previewRiskAwal').textContent = level;
+}
+
+// ════════════════════════════════════════════════════════
+// FORM HELPERS
+// ════════════════════════════════════════════════════════
+async function getNextNoHazard() {
+  try {
+    const res = await gasRequest('getLastNo');
+    return res.ok ? res.next : 'IADL0001';
+  } catch { return 'IADL0001'; }
+}
+
+async function openNewForm() {
+  resetForm();
+  const no = await getNextNoHazard();
+  document.getElementById('f_noHazard').value = no;
+  document.getElementById('btnSubmitLabel').textContent = 'Simpan Data';
+  STATE.editMode = false;
+  // Open collapse
+  const c = bootstrap.Collapse.getOrCreateInstance(document.getElementById('formCollapse'));
+  c.show();
+  document.getElementById('formCollapse').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ════════════════════════════════════════════════════════
+// CRUD
+// ════════════════════════════════════════════════════════
+async function loadRecords() {
+  showLoading('Memuat data risiko...');
+  try {
+    const res = await gasRequest('getRecords', { dept: STATE.dept });
+    if (res.ok) {
+      STATE.records = res.records;
+      renderTable();
+      updateStats();
+    } else {
+      toast(res.msg || 'Gagal memuat data.', 'error');
+    }
+  } catch (e) {
+    toast('Tidak dapat terhubung ke server.', 'error');
+  }
+  hideLoading();
+}
+
+async function submitForm(e) {
+  e.preventDefault();
+
+  const ts = new Date().toLocaleString('id-ID');
+  const data = {
+    'TimeStamp':                       ts,
+    'Departemen':                      STATE.dept,
+    'Aktifitas':                       document.getElementById('f_aktifitas').value,
+    'Lokasi':                          document.getElementById('f_lokasi').value,
+    'Kondisi':                         document.getElementById('f_kondisi').value,
+    'No Hazard':                       document.getElementById('f_noHazard').value,
+    'Klasifikasi Resiko':              document.getElementById('f_klasifikasi').value,
+    'Deskripsi Hazard':                document.getElementById('f_descHazard').value,
+    'Dampak':                          document.getElementById('f_dampak').value,
+    'Nilai Probabilitas':              document.getElementById('f_prob').value,
+    'Nilai Dampak':                    document.getElementById('f_dampakVal').value,
+    'PxD Awal':                        document.getElementById('f_pxdAwal').value,
+    'Penilaian Risiko':                document.getElementById('f_riskAwal').value,
+    'Pengendalian Risiko':             document.getElementById('f_pengendalian').value,
+    'Deskripsi Pengendalian':          document.getElementById('f_descPengendalian').value,
+    'Nilai Pengendalian Probabilitas': document.getElementById('f_ctrlProb').value,
+    'Nilai Penilaian Dampak':          document.getElementById('f_ctrlDampak').value,
+    'PxD Akhir':                       document.getElementById('f_pxdAkhir').value,
+    'Risiko Setelah Pengendalian':     document.getElementById('f_riskAkhir').value,
+  };
+
+  const rowNum = document.getElementById('f_row').value;
+  if (rowNum) data._row = Number(rowNum);
+
+  showLoading(rowNum ? 'Memperbarui data...' : 'Menyimpan data...');
+  try {
+    const action = rowNum ? 'updateRecord' : 'addRecord';
+    const res = await gasRequest(action, { data });
+    if (res.ok) {
+      toast(res.msg, 'success');
+      resetForm();
+      bootstrap.Collapse.getOrCreateInstance(document.getElementById('formCollapse')).hide();
+      await loadRecords();
+    } else {
+      toast(res.msg || 'Gagal menyimpan.', 'error');
+    }
+  } catch (e) {
+    toast('Tidak dapat terhubung ke server.', 'error');
+  }
+  hideLoading();
+}
+
+function editRecord(idx) {
+  const rec = STATE.records[idx];
+  if (!rec) return;
+
+  document.getElementById('f_row').value           = rec._row;
+  document.getElementById('f_noHazard').value      = rec['No Hazard'] || '';
+  document.getElementById('f_aktifitas').value     = rec['Aktifitas'] || '';
+  document.getElementById('f_lokasi').value        = rec['Lokasi'] || '';
+  document.getElementById('f_kondisi').value       = rec['Kondisi'] || '';
+  document.getElementById('f_klasifikasi').value   = rec['Klasifikasi Resiko'] || '';
+  document.getElementById('f_descHazard').value    = rec['Deskripsi Hazard'] || '';
+  document.getElementById('f_dampak').value        = rec['Dampak'] || '';
+  document.getElementById('f_prob').value          = rec['Nilai Probabilitas'] || '';
+  document.getElementById('f_dampakVal').value     = rec['Nilai Dampak'] || '';
+  document.getElementById('f_pengendalian').value  = rec['Pengendalian Risiko'] || '';
+  document.getElementById('f_descPengendalian').value = rec['Deskripsi Pengendalian'] || '';
+  document.getElementById('f_ctrlProb').value      = rec['Nilai Pengendalian Probabilitas'] || '';
+  document.getElementById('f_ctrlDampak').value    = rec['Nilai Penilaian Dampak'] || '';
+
+  calcRisk();
+  calcRiskAfter();
+
+  document.getElementById('btnSubmitLabel').textContent = 'Perbarui Data';
+  STATE.editMode = true;
+
+  const c = bootstrap.Collapse.getOrCreateInstance(document.getElementById('formCollapse'));
+  c.show();
+  document.getElementById('formCollapse').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function deleteRecord(idx) {
+  const rec = STATE.records[idx];
+  if (!rec) return;
+  STATE.deleteRowNum   = rec._row;
+  STATE.deleteHazardNo = rec['No Hazard'];
+  document.getElementById('deleteHazardNo').textContent = rec['No Hazard'];
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+
+async function confirmDelete() {
+  bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+  showLoading('Menghapus data...');
+  try {
+    const res = await gasRequest('deleteRecord', { id: STATE.deleteRowNum });
+    if (res.ok) {
+      toast(res.msg, 'success');
+      await loadRecords();
+    } else {
+      toast(res.msg || 'Gagal menghapus.', 'error');
+    }
+  } catch (e) {
+    toast('Tidak dapat terhubung ke server.', 'error');
+  }
+  hideLoading();
+}
+
+// ════════════════════════════════════════════════════════
+// RENDER TABLE
+// ════════════════════════════════════════════════════════
+function riskBadge(level) {
+  const map = {
+    'Extreme': 'risk-extreme', 'High': 'risk-high',
+    'Medium':  'risk-medium',  'Low': 'risk-low'
+  };
+  const cls = map[level] || 'risk-low';
+  const icon = level === 'Extreme' ? 'bi-exclamation-octagon-fill' :
+               level === 'High'    ? 'bi-exclamation-triangle-fill' :
+               level === 'Medium'  ? 'bi-dash-circle-fill' : 'bi-check-circle-fill';
+  return `<span class="risk-badge ${cls}"><i class="bi ${icon}"></i>${level || '—'}</span>`;
+}
+
+function renderTable() {
+  const q       = document.getElementById('searchInput').value.toLowerCase();
+  const fRisk   = document.getElementById('filterRisk').value;
+  const fKond   = document.getElementById('filterKondisi').value;
+
+  const filtered = STATE.records.filter(r => {
+    const match = !q || [r['Aktifitas'], r['Lokasi'], r['Deskripsi Hazard'], r['No Hazard']]
+      .some(v => String(v || '').toLowerCase().includes(q));
+    const riskMatch = !fRisk || (r['Penilaian Risiko'] || '').includes(fRisk);
+    const kondMatch = !fKond || r['Kondisi'] === fKond;
+    return match && riskMatch && kondMatch;
+  });
+
+  document.getElementById('recordCount').textContent = `${filtered.length} entri`;
+  const tbody = document.getElementById('tableBody');
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><i class="bi bi-inbox"></i><p>Tidak ada data ditemukan.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((r, i) => {
+    const origIdx = STATE.records.indexOf(r);
+    const ts = r['TimeStamp'] ? String(r['TimeStamp']).substring(0, 16) : '—';
+    return `
+    <tr>
+      <td class="text-muted-custom font-mono" style="font-size:11px">${i + 1}</td>
+      <td><span class="no-hazard-code">${r['No Hazard'] || '—'}</span></td>
+      <td class="bold-cell" style="max-width:150px;white-space:normal">${r['Aktifitas'] || '—'}</td>
+      <td>${r['Lokasi'] || '—'}</td>
+      <td><span class="risk-badge" style="background:rgba(148,163,184,0.1);color:var(--clr-subtle);border:1px solid var(--clr-border2)">${r['Kondisi'] || '—'}</span></td>
+      <td style="max-width:180px;white-space:normal;font-size:12px;color:var(--clr-muted)">${(r['Deskripsi Hazard'] || '—').substring(0, 80)}${r['Deskripsi Hazard']?.length > 80 ? '…' : ''}</td>
+      <td class="font-mono text-center" style="color:var(--clr-amber)">${r['PxD Awal'] || '—'}</td>
+      <td>${riskBadge(r['Penilaian Risiko'])}</td>
+      <td style="font-size:12px;color:var(--clr-muted)">${r['Pengendalian Risiko'] || '—'}</td>
+      <td class="font-mono text-center" style="color:var(--clr-green)">${r['PxD Akhir'] || '—'}</td>
+      <td>${riskBadge(r['Risiko Setelah Pengendalian'])}</td>
+      <td style="font-size:11px;color:var(--clr-muted);white-space:nowrap">${ts}</td>
+      <td>
+        <div class="d-flex gap-1">
+          <button class="btn-edit-soft" onclick="editRecord(${origIdx})" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button class="btn-danger-soft" onclick="deleteRecord(${origIdx})" title="Hapus"><i class="bi bi-trash3"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+// STATS
+// ════════════════════════════════════════════════════════
+function updateStats() {
+  const r = STATE.records;
+  document.getElementById('statTotal').textContent   = r.length;
+  document.getElementById('statExtreme').textContent = r.filter(x => x['Penilaian Risiko'] === 'Extreme').length;
+  document.getElementById('statHigh').textContent    = r.filter(x => x['Penilaian Risiko'] === 'High').length;
+  document.getElementById('statMedium').textContent  = r.filter(x => x['Penilaian Risiko'] === 'Medium').length;
+  document.getElementById('statLow').textContent     = r.filter(x => x['Penilaian Risiko'] === 'Low').length;
+}
+
+// ════════════════════════════════════════════════════════
+// TOGGLE FORM BUTTON
+// ════════════════════════════════════════════════════════
+document.getElementById('toggleFormBtn')?.addEventListener('click', async function () {
+  const c = bootstrap.Collapse.getOrCreateInstance(document.getElementById('formCollapse'));
+  const isOpen = document.getElementById('formCollapse').classList.contains('show');
+  if (!isOpen && !STATE.editMode) {
+    const no = await getNextNoHazard();
+    document.getElementById('f_noHazard').value = no;
+  }
+});
+
+// ════════════════════════════════════════════════════════
+// HINT / TOOLTIP SYSTEM
+// ════════════════════════════════════════════════════════
+
+const HINTS = {
+
+  no_hazard: {
+    icon: 'bi-hash',
+    title: 'Nomor Hazard (Auto)',
+    body: `<p class="ht-desc">Nomor unik identifikasi hazard yang digenerate otomatis oleh sistem berdasarkan data terakhir di database.</p>
+    <div class="ht-example"><strong>Format:</strong> IADL<em>XXXX</em> — contoh: <strong>IADL0001</strong>, <strong>IADL0042</strong><br>Nomor ini tidak dapat diubah secara manual.</div>`
+  },
+
+  aktifitas: {
+    icon: 'bi-activity',
+    title: 'Aktifitas',
+    body: `<p class="ht-desc">Tuliskan nama kegiatan atau proses kerja yang sedang diidentifikasi potensi hazard-nya. Deskripsikan secara spesifik agar mudah dilacak.</p>
+    <div class="ht-example"><strong>Contoh:</strong><br>
+    • Pengisian bahan bakar solar genset<br>
+    • Perawatan mesin kompressor udara<br>
+    • Pembuangan limbah cair proses produksi<br>
+    • Pengelasan pipa di ruang terbatas</div>`
+  },
+
+  lokasi: {
+    icon: 'bi-geo-alt',
+    title: 'Lokasi',
+    body: `<p class="ht-desc">Cantumkan lokasi spesifik di mana aktifitas tersebut dilakukan. Semakin detail, semakin mudah tim K3 melakukan inspeksi lapangan.</p>
+    <div class="ht-example"><strong>Contoh:</strong><br>
+    • Gudang Bahan Kimia – Blok C, Lt. 1<br>
+    • Area Workshop Mesin, Divisi Produksi<br>
+    • IPAL (Instalasi Pengolahan Air Limbah)<br>
+    • Atap Gedung Kantor Pusat</div>`
+  },
+
+  kondisi: {
+    icon: 'bi-sliders',
+    title: 'Kondisi Operasi',
+    body: `<p class="ht-desc">Kondisi saat aktifitas berlangsung mempengaruhi tingkat risiko. Pilih kondisi yang paling sesuai dengan situasi saat hazard teridentifikasi.</p>
+    <div class="ht-options">
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(34,197,94,0.15);color:#4ade80">N</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Normal</span>Operasi berjalan sesuai prosedur standar. Semua parameter dalam batas desain.</div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(245,158,11,0.15);color:#fbbf24">A</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Abnormal</span>Kondisi tidak biasa: start-up, shutdown, perawatan, atau parameter di luar batas normal namun masih terkendali.</div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(239,68,68,0.15);color:#f87171">E</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Emergency</span>Kondisi darurat: kebakaran, tumpahan besar, kerusakan kritis, atau situasi yang mengancam keselamatan dan lingkungan.</div>
+      </div>
+    </div>`
+  },
+
+  klasifikasi: {
+    icon: 'bi-tag',
+    title: 'Klasifikasi Risiko (Manual)',
+    body: `<p class="ht-desc">Klasifikasi awal berdasarkan penilaian kualitatif petugas terhadap potensi bahaya secara keseluruhan — sebelum perhitungan PxD dilakukan.</p>
+    <div class="ht-options">
+      <div class="ht-option">
+        <div class="ht-opt-badge risk-extreme" style="font-size:9px">EXT</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Ekstrim</span>Bahaya sangat tinggi, berdampak luas dan permanen terhadap lingkungan. Butuh tindakan segera.</div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge risk-high" style="font-size:9px">TGG</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Tinggi</span>Dampak signifikan, perlu pengendalian serius. Potensi pencemaran atau kerusakan ekosistem.</div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge risk-medium" style="font-size:9px">SDG</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Sedang</span>Dampak terbatas dan dapat dipulihkan. Perlu pengendalian rutin dan pemantauan berkala.</div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge risk-low" style="font-size:9px">RDH</div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Rendah</span>Dampak minimal, dapat dikelola dengan prosedur standar yang sudah ada.</div>
+      </div>
+    </div>`
+  },
+
+  desc_hazard: {
+    icon: 'bi-exclamation-triangle',
+    title: 'Deskripsi Hazard',
+    body: `<p class="ht-desc">Uraikan secara detail <strong style="color:var(--clr-text)">sumber bahaya</strong> atau <strong style="color:var(--clr-text)">kondisi berbahaya</strong> yang teridentifikasi. Fokus pada <em>APA</em> bahayanya, bukan akibatnya.</p>
+    <div class="ht-example"><strong>Contoh yang baik:</strong><br>
+    • "Kebocoran pipa BBM Solar di area tangki penyimpanan akibat korosi fitting"<br>
+    • "Debu silika yang dihasilkan dari proses pemotongan beton menggunakan grinder tanpa penutup"<br>
+    • "Potensi tumpahan oli hidrolik dari mesin press akibat seal aus"</div>
+    <div class="ht-example" style="border-color:var(--clr-red);background:rgba(239,68,68,0.05)"><strong style="color:var(--clr-red)">Hindari deskripsi umum seperti:</strong><br>
+    ✗ "Bahaya lingkungan" — terlalu umum<br>
+    ✗ "Ada risiko pencemaran" — tidak spesifik</div>`
+  },
+
+  dampak_desc: {
+    icon: 'bi-arrow-right-circle',
+    title: 'Dampak Terhadap Lingkungan',
+    body: `<p class="ht-desc">Uraikan <strong style="color:var(--clr-text)">konsekuensi nyata</strong> yang dapat terjadi pada lingkungan jika hazard tersebut tidak dikendalikan. Pertimbangkan media lingkungan yang terdampak.</p>
+    <div class="ht-options">
+      <div class="ht-option" style="padding:5px 8px">
+        <div class="ht-opt-badge" style="background:rgba(0,153,255,0.1);color:var(--clr-accent2);font-size:12px"><i class="bi bi-droplet"></i></div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Pencemaran Air</span>Limbah cair, tumpahan B3, kontaminasi air tanah/sungai</div>
+      </div>
+      <div class="ht-option" style="padding:5px 8px">
+        <div class="ht-opt-badge" style="background:rgba(148,163,184,0.1);color:var(--clr-subtle);font-size:12px"><i class="bi bi-wind"></i></div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Pencemaran Udara</span>Emisi gas, debu, bau menyengat, asap pembakaran</div>
+      </div>
+      <div class="ht-option" style="padding:5px 8px">
+        <div class="ht-opt-badge" style="background:rgba(245,158,11,0.1);color:var(--clr-amber);font-size:12px"><i class="bi bi-layers"></i></div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Pencemaran Tanah</span>Tumpahan bahan kimia, pembuangan limbah padat B3</div>
+      </div>
+      <div class="ht-option" style="padding:5px 8px">
+        <div class="ht-opt-badge" style="background:rgba(34,197,94,0.1);color:var(--clr-green);font-size:12px"><i class="bi bi-tree"></i></div>
+        <div class="ht-opt-text"><span class="ht-opt-name">Kerusakan Ekosistem</span>Gangguan flora/fauna, penurunan keanekaragaman hayati</div>
+      </div>
+    </div>`
+  },
+
+  probabilitas: {
+    icon: 'bi-bar-chart',
+    title: 'Nilai Probabilitas (Kemungkinan Terjadi)',
+    body: `<p class="ht-desc">Seberapa besar kemungkinan hazard ini benar-benar terjadi dan menimbulkan dampak lingkungan. Gunakan data historik atau pengamatan lapangan sebagai dasar.</p>
+    <table class="ht-table">
+      <thead><tr><th>Skor</th><th>Tingkat</th><th>Kriteria / Frekuensi</th></tr></thead>
+      <tbody>
+        <tr><td class="score-cell">1</td><td style="color:#4ade80;font-weight:600">Sangat Jarang</td><td>Belum pernah terjadi. Hanya mungkin dalam kondisi luar biasa. &lt; 1× per 10 tahun.</td></tr>
+        <tr><td class="score-cell">2</td><td style="color:#86efac;font-weight:600">Jarang</td><td>Pernah terjadi sekali. Tidak diperkirakan terjadi lagi. 1× per 5–10 tahun.</td></tr>
+        <tr><td class="score-cell">3</td><td style="color:#fbbf24;font-weight:600">Kadang-kadang</td><td>Dapat terjadi dalam kondisi tertentu. 1× per 1–5 tahun.</td></tr>
+        <tr><td class="score-cell">4</td><td style="color:#fb923c;font-weight:600">Sering</td><td>Terjadi beberapa kali. Diperkirakan akan terjadi lagi. 1× per bulan–tahun.</td></tr>
+        <tr><td class="score-cell">5</td><td style="color:#f87171;font-weight:600">Sangat Sering</td><td>Terjadi berulang kali dan diperkirakan terus terjadi. 1× per minggu–bulan.</td></tr>
+        <tr><td class="score-cell">6</td><td style="color:#ef4444;font-weight:600">Hampir Pasti</td><td>Hampir dipastikan akan terjadi. Sudah menjadi pola. Hampir setiap hari.</td></tr>
+      </tbody>
+    </table>`
+  },
+
+  nilai_dampak: {
+    icon: 'bi-graph-up-arrow',
+    title: 'Nilai Dampak (Severity)',
+    body: `<p class="ht-desc">Seberapa besar dampak negatif yang akan ditimbulkan jika hazard ini benar-benar terjadi, terhadap lingkungan, komunitas, dan reputasi perusahaan.</p>
+    <table class="ht-table">
+      <thead><tr><th>Skor</th><th>Tingkat</th><th>Deskripsi Dampak</th></tr></thead>
+      <tbody>
+        <tr><td class="score-cell">1</td><td style="color:#4ade80;font-weight:600">Tidak Signifikan</td><td>Dampak sangat kecil, bersifat lokal, pulih sendiri dalam hitungan jam. Tidak perlu laporan.</td></tr>
+        <tr><td class="score-cell">2</td><td style="color:#86efac;font-weight:600">Minor</td><td>Dampak kecil, dapat segera ditangani tim internal. Pemulihan &lt; 1 minggu. Tidak ada regulasi yang dilanggar.</td></tr>
+        <tr><td class="score-cell">3</td><td style="color:#fbbf24;font-weight:600">Sedang</td><td>Dampak terbatas, perlu tindakan segera. Pemulihan 1–4 minggu. Perlu laporan internal.</td></tr>
+        <tr><td class="score-cell">4</td><td style="color:#fb923c;font-weight:600">Mayor</td><td>Dampak luas, memerlukan bantuan eksternal. Pemulihan &gt; 1 bulan. Potensi sanksi regulasi dan liputan media.</td></tr>
+        <tr><td class="score-cell">5</td><td style="color:#ef4444;font-weight:600">Katastrofik</td><td>Dampak sangat besar dan permanen. Kerusakan ekosistem jangka panjang. Sanksi hukum berat, tuntutan pidana.</td></tr>
+      </tbody>
+    </table>`
+  },
+
+  pxd: {
+    icon: 'bi-calculator',
+    title: 'PxD — Probabilitas × Dampak',
+    body: `<p class="ht-desc">Nilai risiko awal dihitung secara otomatis dari perkalian Nilai Probabilitas dan Nilai Dampak yang Anda pilih.</p>
+    <code class="ht-formula">PxD = Probabilitas × Dampak</code>
+    <p class="ht-desc">Contoh: Prob = 3, Dampak = 4 → PxD = <strong style="color:var(--clr-accent)">12 (High)</strong></p>`
+  },
+
+  pxd_akhir: {
+    icon: 'bi-calculator-fill',
+    title: 'PxD Akhir — Setelah Pengendalian',
+    body: `<p class="ht-desc">Nilai risiko yang tersisa setelah tindakan pengendalian diterapkan. Diharapkan lebih rendah dari PxD Awal, membuktikan efektivitas pengendalian.</p>
+    <code class="ht-formula">PxD Akhir = Prob. Akhir × Dampak Akhir</code>
+    <div class="ht-example"><strong>Target ideal:</strong> PxD Akhir harus &lt; PxD Awal. Jika nilainya sama atau lebih tinggi, tinjau kembali efektivitas pengendalian yang dipilih.</div>`
+  },
+
+  risk_level: {
+    icon: 'bi-shield-half',
+    title: 'Level Risiko Otomatis',
+    body: `<p class="ht-desc">Level risiko ditentukan otomatis berdasarkan nilai PxD menggunakan matriks standar manajemen risiko lingkungan.</p>
+    <div class="risk-matrix">
+      <div class="rm-cell risk-low">1–5<br>LOW</div>
+      <div class="rm-cell risk-medium">6–10<br>MEDIUM</div>
+      <div class="rm-cell risk-high">11–15<br>HIGH</div>
+      <div class="rm-cell risk-extreme">16–30<br>EXTREME</div>
+    </div>
+    <table class="ht-table" style="margin-top:10px">
+      <thead><tr><th>Level</th><th>Nilai PxD</th><th>Tindakan</th></tr></thead>
+      <tbody>
+        <tr><td><span class="risk-badge risk-low">Low</span></td><td class="score-cell">1–5</td><td>Pantau rutin, prosedur standar memadai</td></tr>
+        <tr><td><span class="risk-badge risk-medium">Medium</span></td><td class="score-cell">6–10</td><td>Pengendalian tambahan, jadwalkan perbaikan</td></tr>
+        <tr><td><span class="risk-badge risk-high">High</span></td><td class="score-cell">11–15</td><td>Tindakan segera, eskalasi ke manajemen</td></tr>
+        <tr><td><span class="risk-badge risk-extreme">Extreme</span></td><td class="score-cell">16–30</td><td>Hentikan aktifitas, penanganan darurat</td></tr>
+      </tbody>
+    </table>`
+  },
+
+  pengendalian: {
+    icon: 'bi-shield-check',
+    title: 'Hirarki Pengendalian Risiko',
+    body: `<p class="ht-desc">Pilih metode pengendalian sesuai <strong style="color:var(--clr-text)">Hierarki Pengendalian HIRARC</strong>. Urutan dari paling efektif ke paling rendah:</p>
+    <div class="ht-options">
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(34,197,94,0.15);color:#4ade80;font-size:10px;font-weight:800">1</div>
+        <div class="ht-opt-text">
+          <span class="ht-opt-name">🔴 Eliminasi</span>
+          <span style="font-size:11px;color:var(--clr-muted)">Menghilangkan sumber bahaya sepenuhnya dari proses kerja. Paling efektif karena hazard tidak ada lagi.</span>
+          <span style="font-size:11px;color:var(--clr-accent);display:block;margin-top:2px">Contoh: Berhenti menggunakan bahan kimia berbahaya; menghapus proses yang menghasilkan limbah B3.</span>
+        </div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(34,197,94,0.12);color:#86efac;font-size:10px;font-weight:800">2</div>
+        <div class="ht-opt-text">
+          <span class="ht-opt-name">🟡 Substitusi</span>
+          <span style="font-size:11px;color:var(--clr-muted)">Mengganti bahan/proses berbahaya dengan yang lebih aman atau ramah lingkungan.</span>
+          <span style="font-size:11px;color:var(--clr-accent);display:block;margin-top:2px">Contoh: Ganti pelarut organik dengan water-based solvent; ganti BBM solar dengan gas alam.</span>
+        </div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(245,158,11,0.12);color:#fbbf24;font-size:10px;font-weight:800">3</div>
+        <div class="ht-opt-text">
+          <span class="ht-opt-name">🔵 Rekayasa Teknik</span>
+          <span style="font-size:11px;color:var(--clr-muted)">Modifikasi fisik/teknis pada peralatan, fasilitas, atau proses untuk mengisolasi atau mengurangi hazard.</span>
+          <span style="font-size:11px;color:var(--clr-accent);display:block;margin-top:2px">Contoh: Pasang secondary containment; instalasi scrubber gas; sistem ventilasi lokal.</span>
+        </div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(0,153,255,0.12);color:#60a5fa;font-size:10px;font-weight:800">4</div>
+        <div class="ht-opt-text">
+          <span class="ht-opt-name">⚪ Administrasi</span>
+          <span style="font-size:11px;color:var(--clr-muted)">Pengendalian melalui prosedur, pelatihan, rotasi kerja, atau pengaturan administratif lainnya.</span>
+          <span style="font-size:11px;color:var(--clr-accent);display:block;margin-top:2px">Contoh: SOP pengelolaan limbah B3; jadwal inspeksi rutin; pelatihan penanganan tumpahan.</span>
+        </div>
+      </div>
+      <div class="ht-option">
+        <div class="ht-opt-badge" style="background:rgba(239,68,68,0.12);color:#f87171;font-size:10px;font-weight:800">5</div>
+        <div class="ht-opt-text">
+          <span class="ht-opt-name">🟠 APD</span>
+          <span style="font-size:11px;color:var(--clr-muted)">Alat Pelindung Diri — pilihan terakhir karena tidak mengurangi hazard, hanya melindungi pekerja.</span>
+          <span style="font-size:11px;color:var(--clr-accent);display:block;margin-top:2px">Contoh: Masker respirator, sarung tangan kimia, pakaian hazmat, kacamata pelindung.</span>
+        </div>
+      </div>
+    </div>`
+  },
+
+  desc_pengendalian: {
+    icon: 'bi-card-text',
+    title: 'Deskripsi Pengendalian',
+    body: `<p class="ht-desc">Uraikan secara spesifik <strong style="color:var(--clr-text)">langkah-langkah konkret</strong> yang dilakukan untuk mengendalikan hazard. Sertakan detail teknis, penanggung jawab, dan timeline jika memungkinkan.</p>
+    <div class="ht-example"><strong>Contoh deskripsi yang baik:</strong><br>
+    • "Pemasangan <em>drip tray</em> kapasitas 110% di bawah tangki solar, dilengkapi sensor level dan alarm otomatis. PIC: Tim Teknik. Target selesai: 30 hari."<br>
+    • "Pemberlakuan prosedur inspeksi harian (checklist INS-001) oleh operator sebelum setiap operasi mesin. Pelatihan ulang seluruh operator pada Q1."</div>`
+  },
+
+  ctrl_prob: {
+    icon: 'bi-bar-chart-steps',
+    title: 'Probabilitas Setelah Pengendalian',
+    body: `<p class="ht-desc">Nilai probabilitas yang diperkirakan <strong style="color:var(--clr-text)">setelah</strong> tindakan pengendalian diterapkan. Harus lebih rendah atau sama dengan nilai probabilitas awal.</p>
+    <div class="ht-example"><strong>Panduan pengisian:</strong><br>
+    Jika awalnya probabilitas = 4 (Sering), dan setelah pemasangan alat deteksi otomatis kemungkinan kejadian turun drastis → isi 1 atau 2.<br><br>
+    <strong style="color:var(--clr-red)">⚠ Jangan isi nilai lebih tinggi dari probabilitas awal</strong> kecuali ada justifikasi khusus.</div>`
+  },
+
+  ctrl_dampak: {
+    icon: 'bi-graph-down-arrow',
+    title: 'Dampak Setelah Pengendalian',
+    body: `<p class="ht-desc">Nilai severity/dampak yang diperkirakan <strong style="color:var(--clr-text)">setelah</strong> tindakan pengendalian diterapkan. Tindakan seperti secondary containment atau IPAL dapat menurunkan nilai ini.</p>
+    <div class="ht-example"><strong>Panduan:</strong><br>
+    Jika awalnya dampak = 5 (Katastrofik), dan setelah instalasi secondary containment potensi ceceran dapat dibatasi → isi 2 atau 3.<br><br>
+    Nilai dampak biasanya lebih sulit diturunkan dibanding probabilitas karena bersifat inheren terhadap jenis hazard.</div>`
+  }
+};
+
+// Inline select-change hint panels
+const SELECT_HINTS = {
+  kondisi_val: {
+    'Normal':    { color: '#4ade80', bg: 'rgba(34,197,94,0.06)', icon: 'bi-check-circle', text: 'Operasi berlangsung sesuai prosedur standar. Semua sistem berfungsi dalam batas desain normal.' },
+    'Abnormal':  { color: '#fbbf24', bg: 'rgba(245,158,11,0.06)', icon: 'bi-exclamation-circle', text: 'Kondisi di luar normal: start-up, shutdown, perawatan periodik, atau parameter di ambang batas. Perlu pengawasan ekstra.' },
+    'Emergency': { color: '#f87171', bg: 'rgba(239,68,68,0.06)', icon: 'bi-x-octagon', text: 'Situasi darurat: kebakaran, ledakan, tumpahan masif B3, atau kondisi yang memerlukan evakuasi dan penanganan segera.' }
+  },
+  klasifikasi_val: {
+    'Ekstrim': { color: '#f87171', bg: 'rgba(239,68,68,0.06)', icon: 'bi-exclamation-octagon-fill', text: 'Risiko sangat tinggi. Dampak lingkungan bersifat luas, parah, dan sulit dipulihkan. Aktifitas harus dihentikan sampai pengendalian memadai tersedia.' },
+    'Tinggi':  { color: '#fbbf24', bg: 'rgba(245,158,11,0.06)', icon: 'bi-exclamation-triangle-fill', text: 'Risiko tinggi. Berpotensi mencemari lingkungan secara signifikan. Memerlukan pengendalian serius dan pemantauan intensif.' },
+    'Sedang':  { color: '#60a5fa', bg: 'rgba(0,153,255,0.06)', icon: 'bi-dash-circle-fill', text: 'Risiko sedang. Dampak terbatas dan dapat dipulihkan. Pengendalian rutin dan pemantauan berkala sudah mencukupi.' },
+    'Rendah':  { color: '#4ade80', bg: 'rgba(34,197,94,0.06)', icon: 'bi-check-circle-fill', text: 'Risiko rendah. Dampak minimal, dapat dikelola dengan prosedur standar operasi yang sudah berjalan.' }
+  },
+  prob_val: {
+    '1': { color: '#4ade80', bg: 'rgba(34,197,94,0.06)', icon: 'bi-1-circle', text: 'Sangat Jarang — Belum pernah terjadi. Hanya terjadi dalam kondisi yang sangat luar biasa. Frekuensi < 1× per 10 tahun.' },
+    '2': { color: '#86efac', bg: 'rgba(34,197,94,0.04)', icon: 'bi-2-circle', text: 'Jarang — Pernah terjadi sekali di masa lalu. Tidak diperkirakan terulang dalam waktu dekat. ~1× per 5–10 tahun.' },
+    '3': { color: '#fde68a', bg: 'rgba(245,158,11,0.05)', icon: 'bi-3-circle', text: 'Kadang-kadang — Dapat terjadi dalam kondisi tertentu. Diperkirakan terjadi ~1× per 1–5 tahun.' },
+    '4': { color: '#fbbf24', bg: 'rgba(245,158,11,0.06)', icon: 'bi-4-circle', text: 'Sering — Sudah terjadi beberapa kali dan diperkirakan akan terjadi lagi. ~1× per bulan hingga per tahun.' },
+    '5': { color: '#fb923c', bg: 'rgba(249,115,22,0.06)', icon: 'bi-5-circle', text: 'Sangat Sering — Terjadi berulang kali secara konsisten. Sudah menjadi pola yang dikenal. ~1× per minggu hingga per bulan.' },
+    '6': { color: '#f87171', bg: 'rgba(239,68,68,0.07)', icon: 'bi-6-circle', text: 'Hampir Pasti — Hampir dipastikan terjadi dalam kondisi apapun. Sudah menjadi kejadian harian atau rutin.' }
+  },
+  dampak_val: {
+    '1': { color: '#4ade80', bg: 'rgba(34,197,94,0.06)', icon: 'bi-1-square', text: 'Tidak Signifikan — Dampak sangat kecil dan bersifat sangat lokal. Pulih sendiri dalam hitungan jam tanpa intervensi.' },
+    '2': { color: '#86efac', bg: 'rgba(34,197,94,0.04)', icon: 'bi-2-square', text: 'Minor — Dampak kecil, penanganan oleh tim internal. Pemulihan < 1 minggu. Tidak ada pelanggaran regulasi.' },
+    '3': { color: '#fde68a', bg: 'rgba(245,158,11,0.05)', icon: 'bi-3-square', text: 'Sedang — Dampak terbatas namun nyata. Butuh tindakan segera. Pemulihan 1–4 minggu. Perlu laporan internal.' },
+    '4': { color: '#fb923c', bg: 'rgba(249,115,22,0.06)', icon: 'bi-4-square', text: 'Mayor — Dampak luas, perlu bantuan eksternal. Pemulihan > 1 bulan. Risiko sanksi regulasi dan eksposur media.' },
+    '5': { color: '#f87171', bg: 'rgba(239,68,68,0.07)', icon: 'bi-5-square', text: 'Katastrofik — Kerusakan permanen dan sangat luas terhadap ekosistem. Sanksi hukum berat, pencabutan izin, tuntutan pidana.' }
+  },
+  ctrl_prob_val: null, // sama dengan prob_val
+  ctrl_dampak_val: null, // sama dengan dampak_val
+  pengendalian_val: {
+    'Eliminasi':       { color: '#4ade80', bg: 'rgba(34,197,94,0.06)', icon: 'bi-slash-circle', text: 'Tingkat tertinggi dalam hierarki. Menghilangkan sumber bahaya sepenuhnya. Paling efektif karena hazard tidak ada lagi. Contoh: menghentikan penggunaan bahan kimia berbahaya, menghapus proses penghasil limbah B3.' },
+    'Substitusi':      { color: '#a3e635', bg: 'rgba(163,230,53,0.06)', icon: 'bi-arrow-left-right', text: 'Mengganti hazard dengan sesuatu yang lebih aman. Efektivitas tinggi jika pengganti benar-benar lebih baik. Contoh: ganti pelarut organik dengan water-based; ganti solar dengan gas alam.' },
+    'Rekayasa Teknik': { color: '#60a5fa', bg: 'rgba(0,153,255,0.06)', icon: 'bi-tools', text: 'Modifikasi teknis untuk mengisolasi atau mengurangi hazard secara fisik. Contoh: secondary containment, scrubber, ventilasi lokal, sensor kebocoran otomatis, pipa double-wall.' },
+    'Administrasi':    { color: '#c4b5fd', bg: 'rgba(196,181,253,0.05)', icon: 'bi-file-earmark-text', text: 'Pengendalian melalui sistem dan prosedur. Bergantung pada kepatuhan manusia. Contoh: SOP pengelolaan limbah, jadwal inspeksi, pelatihan K3LH, permit to work, rotasi tugas.' },
+    'APD':             { color: '#fca5a5', bg: 'rgba(239,68,68,0.05)', icon: 'bi-shield-fill-exclamation', text: 'Tingkat terendah — PILIHAN TERAKHIR. Tidak mengurangi hazard, hanya melindungi individu. Harus digunakan bersamaan dengan pengendalian lainnya. Contoh: masker respirator, sarung tangan kimia, hazmat suit.' }
+  }
+};
+// Alias
+SELECT_HINTS.ctrl_prob_val  = SELECT_HINTS.prob_val;
+SELECT_HINTS.ctrl_dampak_val = SELECT_HINTS.dampak_val;
+
+// ── Show inline hint panel below select ──────────────────
+function showSelectHint(key, value) {
+  const panelId = key + '_hint';
+  const panel   = document.getElementById(panelId);
+  if (!panel) return;
+  if (!value || !SELECT_HINTS[key] || !SELECT_HINTS[key][value]) {
+    panel.style.display = 'none'; return;
+  }
+  const h = SELECT_HINTS[key][value];
+  panel.style.display = 'block';
+  panel.style.background = h.bg;
+  panel.style.borderColor = h.color + '44';
+  panel.innerHTML = `<div class="hint-panel-inner">
+    <div class="hint-panel-title" style="color:${h.color}"><i class="bi ${h.icon}"></i>${value}</div>
+    <div style="font-size:12px;color:var(--clr-muted);line-height:1.55">${h.text}</div>
+  </div>`;
+}
+
+// ── Tooltip popup on hint-icon click ─────────────────────
+let activeTooltip = null;
+let activeIcon    = null;
+
+document.addEventListener('click', function(e) {
+  const icon = e.target.closest('.hint-icon');
+  if (icon) {
+    e.stopPropagation();
+    const key = icon.dataset.hint;
+    if (activeIcon === icon) { closeTooltip(); return; }
+    showHintTooltip(icon, key);
+    return;
+  }
+  const tooltip = document.getElementById('hintTooltip');
+  if (tooltip && !tooltip.contains(e.target)) closeTooltip();
+});
+
+function closeTooltip() {
+  const t = document.getElementById('hintTooltip');
+  if (t) { t.style.display = 'none'; t.classList.remove('visible'); }
+  activeIcon = null;
+}
+
+function showHintTooltip(iconEl, key) {
+  const def = HINTS[key];
+  if (!def) return;
+
+  const t = document.getElementById('hintTooltip');
+  t.innerHTML = `
+    <div class="ht-header">
+      <i class="bi ${def.icon} ht-header-icon"></i>
+      <span class="ht-header-title">${def.title}</span>
+    </div>
+    <div class="ht-body">${def.body}</div>`;
+  t.style.display = 'block';
+  t.classList.add('visible');
+  activeIcon = iconEl;
+
+  // Position
+  const rect = iconEl.getBoundingClientRect();
+  const tw   = 300;
+  let left   = rect.left + window.scrollX;
+  let top    = rect.bottom + window.scrollY + 6;
+
+  if (left + tw > window.innerWidth - 16) left = window.innerWidth - tw - 16;
+  if (left < 8) left = 8;
+
+  t.style.left = left + 'px';
+  t.style.top  = top  + 'px';
+  t.style.width = tw + 'px';
+
+  // Re-animate
+  t.style.animation = 'none';
+  requestAnimationFrame(() => { t.style.animation = 'tooltipIn 0.18s ease forwards'; });
+}
+
+// ── Extend calcRisk to show reduction indicator ──────────
+function calcRiskAfter() {
+  const p = Number(document.getElementById('f_ctrlProb').value);
+  const d = Number(document.getElementById('f_ctrlDampak').value);
+  const pxd = (p && d) ? p * d : '';
+  document.getElementById('f_pxdAkhir').value = pxd || '';
+  const level = pxd ? riskLevel(pxd) : '—';
+  document.getElementById('f_riskAkhir').value = level;
+  document.getElementById('previewRiskAkhir').textContent = level;
+
+  // Reduction badge
+  const pxdAwal = Number(document.getElementById('f_pxdAwal').value);
+  const badge   = document.getElementById('riskReductionBadge');
+  const text    = document.getElementById('riskReductionText');
+  if (pxd && pxdAwal && badge && text) {
+    const delta = pxdAwal - pxd;
+    badge.style.display = 'block';
+    if (delta > 0) {
+      text.textContent = `↓ Turun ${delta} poin`;
+      text.className = 'risk-badge risk-low';
+    } else if (delta === 0) {
+      text.textContent = '= Tidak berubah';
+      text.className = 'risk-badge risk-medium';
+    } else {
+      text.textContent = `↑ Naik ${Math.abs(delta)} poin`;
+      text.className = 'risk-badge risk-extreme';
+    }
+  } else if (badge) {
+    badge.style.display = 'none';
+  }
+}
+
+// ── Clear inline hints on reset ───────────────────────────
+function resetForm() {
+  document.getElementById('dataForm').reset();
+  document.getElementById('f_row').value = '';
+  document.getElementById('f_pxdAwal').value = '';
+  document.getElementById('f_riskAwal').value = '';
+  document.getElementById('f_pxdAkhir').value = '';
+  document.getElementById('f_riskAkhir').value = '';
+  document.getElementById('previewRiskAwal').textContent = '—';
+  document.getElementById('previewRiskAkhir').textContent = '—';
+  document.getElementById('btnSubmitLabel').textContent = 'Simpan Data';
+  STATE.editMode = false;
+  ['kondisi_val','klasifikasi_val','prob_val','dampak_val',
+   'pengendalian_val','ctrl_prob_val','ctrl_dampak_val'].forEach(k => {
+    const el = document.getElementById(k + '_hint');
+    if (el) el.style.display = 'none';
+  });
+  const badge = document.getElementById('riskReductionBadge');
+  if (badge) badge.style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════
+initLogin();
+</script>
+</body>
+</html>
