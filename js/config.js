@@ -14,7 +14,9 @@ const STATE = {
 };
 
 // Risk level thresholds
-const RISK_THRESHOLDS = { EXTREME: 16, HIGH: 11, MEDIUM: 6 };
+// PxD range: Prob(1–6) × Dampak(1–5) → max = 30
+// Low: 1–3 | Medium: 4–6 | High: 8–12 | Extreme: 15–30
+const RISK_THRESHOLDS = { EXTREME: 15, HIGH: 8, MEDIUM: 4 };
 
 function riskLevel(pxd) {
   const n = Number(pxd);
