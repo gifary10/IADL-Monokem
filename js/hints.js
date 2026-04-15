@@ -96,8 +96,17 @@ const HINTS = {
     icon: 'bi-calculator',
     title: 'PxD — Probabilitas × Dampak',
     body: `<p class="ht-desc">Nilai risiko awal dihitung otomatis dari perkalian Probabilitas dan Dampak.</p>
-    <code class="ht-formula">PxD = Probabilitas × Dampak</code>
-    <p class="ht-desc">Contoh: Prob = 3, Dampak = 4 → PxD = <strong style="color:var(--clr-accent)">12 (High)</strong></p>`
+    <code class="ht-formula">PxD = Probabilitas (1–6) × Dampak (1–5)</code>
+    <p class="ht-desc">Contoh: Prob = 3, Dampak = 4 → PxD = <strong style="color:var(--clr-accent)">12 (High)</strong></p>
+    <table class="ht-table" style="margin-top:8px">
+      <thead><tr><th>Range PxD</th><th>Level</th></tr></thead>
+      <tbody>
+        <tr><td class="score-cell">1–3</td><td style="color:#10b981;font-weight:600">Low</td></tr>
+        <tr><td class="score-cell">4–6</td><td style="color:#3b82f6;font-weight:600">Medium</td></tr>
+        <tr><td class="score-cell">8–12</td><td style="color:#f59e0b;font-weight:600">High</td></tr>
+        <tr><td class="score-cell">15–30</td><td style="color:#ef4444;font-weight:600">Extreme</td></tr>
+      </tbody>
+    </table>`
   },
   pxd_akhir: {
     icon: 'bi-calculator-fill',
@@ -109,13 +118,14 @@ const HINTS = {
   risk_level: {
     icon: 'bi-shield-half',
     title: 'Level Risiko Otomatis',
-    body: `<p class="ht-desc">Level risiko ditentukan otomatis berdasarkan nilai PxD.</p>
+    body: `<p class="ht-desc">Level risiko ditentukan otomatis berdasarkan nilai PxD (Probabilitas × Dampak, max = 6×5 = 30).</p>
     <div class="risk-matrix">
-      <div class="rm-cell risk-low">1–5<br>LOW</div>
-      <div class="rm-cell risk-medium">6–10<br>MED</div>
-      <div class="rm-cell risk-high">11–15<br>HIGH</div>
-      <div class="rm-cell risk-extreme">≥16<br>EXT</div>
-    </div>`
+      <div class="rm-cell risk-low">1–3<br>LOW</div>
+      <div class="rm-cell risk-medium">4–6<br>MED</div>
+      <div class="rm-cell risk-high">8–12<br>HIGH</div>
+      <div class="rm-cell risk-extreme">15–30<br>EXT</div>
+    </div>
+    <p style="font-size:11px;color:var(--clr-muted);margin-top:8px">⚠ Nilai 7 dan 13–14 tidak mungkin dihasilkan dari kombinasi Prob (1–6) × Dampak (1–5).</p>`
   },
   pengendalian: {
     icon: 'bi-shield-check',
