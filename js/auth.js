@@ -18,15 +18,29 @@ async function initLogin() {
         opt.textContent = d.name;
         sel.appendChild(opt);
       });
+    } else {
+      console.warn('Failed to fetch departments:', res.msg);
     }
-  } catch (e) { console.warn('Offline mode or GAS URL not set.'); }
+  } catch (e) {
+    console.warn('Offline mode or GAS URL not set:', e.message);
+    // Show offline indicator
+    const errEl = document.getElementById('loginError');
+    if (errEl) {
+      errEl.textContent = 'Mode offline — data departemen tidak dapat dimuat.';
+      errEl.style.display = 'block';
+      errEl.style.color = 'var(--clr-amber)';
+    }
+  }
 
   if (deptSpinner) deptSpinner.style.display = 'none';
   if (loginDept)   loginDept.disabled = false;
 
   // Auto-restore session
   const saved = localStorage.getItem('iadl_dept');
-  if (saved) { STATE.dept = saved; enterApp(); }
+  if (saved) { 
+    STATE.dept = saved; 
+    setTimeout(() => enterApp(), 300);
+  }
 
   // Enter on keyboard
   document.getElementById('loginCode')?.addEventListener('keydown', e => {
@@ -39,8 +53,18 @@ async function doLogin() {
   const code  = document.getElementById('loginCode').value.trim();
   const errEl = document.getElementById('loginError');
 
-  if (!dept) { errEl.textContent = 'Silakan pilih departemen.'; errEl.style.display = 'block'; return; }
-  if (!code) { errEl.textContent = 'Masukkan kode akses.'; errEl.style.display = 'block'; return; }
+  if (!dept) { 
+    errEl.textContent = 'Silakan pilih departemen.'; 
+    errEl.style.display = 'block'; 
+    errEl.style.color = 'var(--clr-red)';
+    return; 
+  }
+  if (!code) { 
+    errEl.textContent = 'Masukkan kode akses.'; 
+    errEl.style.display = 'block'; 
+    errEl.style.color = 'var(--clr-red)';
+    return; 
+  }
   errEl.style.display = 'none';
 
   const btnLogin   = document.getElementById('btnLogin');
@@ -57,12 +81,16 @@ async function doLogin() {
       localStorage.setItem('iadl_dept', dept);
       enterApp();
     } else {
-      errEl.textContent = res.msg || 'Login gagal.';
+      errEl.textContent = res.msg || 'Login gagal. Periksa departemen dan kode akses.';
       errEl.style.display = 'block';
+      errEl.style.color = 'var(--clr-red)';
     }
   } catch (e) {
-    errEl.textContent = 'Tidak dapat terhubung ke server.';
+    const errorMsg = handleApiError(e, 'Tidak dapat terhubung ke server.');
+    errEl.textContent = errorMsg;
     errEl.style.display = 'block';
+    errEl.style.color = 'var(--clr-red)';
+    console.error('Login error:', e);
   }
 
   btnLogin.disabled = false;
@@ -73,15 +101,18 @@ async function doLogin() {
 function enterApp() {
   const overlay = document.getElementById('loginOverlay');
   overlay.classList.add('fade-out');
-  setTimeout(() => { overlay.style.display = 'none'; }, 400);
-  document.getElementById('appNav').style.display  = 'flex';
-  document.getElementById('appMain').style.display = 'block';
-  document.getElementById('navDeptName').textContent = STATE.dept;
-  loadRecords();
+  setTimeout(() => { 
+    overlay.style.display = 'none'; 
+    document.getElementById('appNav').style.display  = 'flex';
+    document.getElementById('appMain').style.display = 'block';
+    document.getElementById('navDeptName').textContent = STATE.dept;
+    loadRecords();
+  }, 400);
 }
 
 function doLogout() {
   localStorage.removeItem('iadl_dept');
+  sessionStorage.removeItem(AUTOSAVE_KEY);
   STATE.dept = null;
   STATE.records = [];
   location.reload();

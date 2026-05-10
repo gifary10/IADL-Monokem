@@ -1,42 +1,117 @@
 // ============================================================
 // evidence.js — Evidence Module
 // - Form fields: Tanggal, PIC, Catatan, Pengesahan
-// - Upload foto → localStorage (base64)
+// - Upload foto → IndexedDB (base64)
 // - Submit metadata → Google Sheets (EVIDENCE sheet via GAS)
 // - Generate PDF report (jsPDF + html2canvas)
 // ============================================================
+
+// ── IndexedDB Helper ────────────────────────────────────────
+const DB_NAME = 'IADL_Evidence_DB';
+const DB_VERSION = 1;
+const STORE_NAME = 'evidence_files';
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+}
+
+async function idbSaveFiles(noHazard, files) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    
+    // Remove old data for this hazard
+    store.delete(noHazard);
+    
+    // Store new data
+    store.put({
+      id: noHazard,
+      files: files,
+      timestamp: new Date().toISOString()
+    });
+    
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = (event) => {
+        // If storage full, try without images
+        if (event.target.error && event.target.error.name === 'QuotaExceededError') {
+          const slimFiles = files.map(f => ({
+            ...f,
+            dataUrl: f.dataUrl ? f.dataUrl.substring(0, 50000) + '...' : ''
+          }));
+          const retryTx = db.transaction(STORE_NAME, 'readwrite');
+          const retryStore = retryTx.objectStore(STORE_NAME);
+          retryStore.put({ id: noHazard + '_slim', files: slimFiles, timestamp: new Date().toISOString() });
+          retryTx.oncomplete = () => resolve();
+          retryTx.onerror = () => reject(event.target.error);
+        } else {
+          reject(event.target.error);
+        }
+      };
+    });
+  } catch (error) {
+    console.error('IndexedDB save error:', error);
+    throw error;
+  }
+}
+
+async function idbLoadFiles(noHazard) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(noHazard);
+    
+    return new Promise((resolve) => {
+      request.onsuccess = () => {
+        const result = request.result;
+        resolve(result ? result.files : []);
+      };
+      request.onerror = () => resolve([]);
+    });
+  } catch (error) {
+    console.error('IndexedDB load error:', error);
+    return [];
+  }
+}
+
+async function idbDeleteFiles(noHazard) {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(noHazard);
+    store.delete(noHazard + '_slim');
+    
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch (error) {
+    console.error('IndexedDB delete error:', error);
+  }
+}
 
 // ── State ─────────────────────────────────────────────────────
 let EV = {
   files:         [],   // { name, size, type, dataUrl }
   selectedHazard: null,
-  storedEvidences: []  // loaded from GAS
+  storedEvidences: [],  // loaded from GAS
+  processing: false    // Flag to prevent double submission
 };
-
-// ── LocalStorage helpers ──────────────────────────────────────
-const LS_KEY = (noHazard) => `iadl_ev_${noHazard}`;
-
-function lsSaveFiles(noHazard, files) {
-  try {
-    localStorage.setItem(LS_KEY(noHazard), JSON.stringify(files));
-  } catch(e) {
-    // localStorage quota — strip large files gracefully
-    const slim = files.map(f => ({ ...f, dataUrl: f.dataUrl.substring(0, 50000) }));
-    try { localStorage.setItem(LS_KEY(noHazard), JSON.stringify(slim)); } catch(_) {}
-    toast('Peringatan: beberapa file terlalu besar untuk cache lokal.', 'warning');
-  }
-}
-
-function lsLoadFiles(noHazard) {
-  try {
-    const raw = localStorage.getItem(LS_KEY(noHazard));
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function lsDeleteFiles(noHazard) {
-  localStorage.removeItem(LS_KEY(noHazard));
-}
 
 // ── Populate hazard dropdown ───────────────────────────────────
 function populateEvidenceHazardSelect() {
@@ -45,10 +120,12 @@ function populateEvidenceHazardSelect() {
   const prev = sel.value;
   sel.innerHTML = '<option value="">— Pilih No Hazard —</option>';
   STATE.records.forEach(r => {
-    const o = document.createElement('option');
-    o.value = r['No Hazard'];
-    o.textContent = `${r['No Hazard']} — ${(r['Aktifitas'] || '').substring(0, 45)}`;
-    sel.appendChild(o);
+    if (r['No Hazard']) {
+      const o = document.createElement('option');
+      o.value = r['No Hazard'];
+      o.textContent = `${r['No Hazard']} — ${(r['Aktifitas'] || '').substring(0, 45)}`;
+      sel.appendChild(o);
+    }
   });
   if (prev) { sel.value = prev; }
 }
@@ -87,9 +164,16 @@ async function onEvidenceHazardChange(val) {
   emptyState.style.display = 'none';
   uploadArea.style.display = 'block';
 
-  // Restore files from localStorage
-  EV.files = lsLoadFiles(val);
-  renderFilePreview();
+  // Restore files from IndexedDB (with loading indicator)
+  showLoading('Memuat file evidence...');
+  try {
+    EV.files = await idbLoadFiles(val);
+    renderFilePreview();
+  } catch (error) {
+    console.error('Failed to load files from IndexedDB:', error);
+    toast('Gagal memuat file dari cache lokal.', 'warning');
+  }
+  hideLoading();
 
   // Load history from GAS
   loadEvidenceHistory(val);
@@ -100,14 +184,19 @@ async function loadEvidenceHistory(noHazard) {
   const historyWrap = document.getElementById('evidenceHistoryWrap');
   const historyBody = document.getElementById('evidenceHistoryBody');
   historyWrap.style.display = 'block';
-  historyBody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--clr-muted)"><div class="mini-spinner" style="margin:0 auto"></div></td></tr>`;
+  historyBody.innerHTML = `<tr><td colspan="7" class="text-center" style="padding:20px;color:var(--clr-muted)">
+    <div class="mini-spinner" style="margin:0 auto"></div>
+    <span style="margin-top:8px;display:block;font-size:12px">Memuat riwayat...</span>
+  </td></tr>`;
 
   try {
     const res = await fetchEvidences(noHazard);
     EV.storedEvidences = res.ok ? res.evidences : [];
     renderEvidenceHistory();
-  } catch {
-    historyBody.innerHTML = `<tr><td colspan="7" class="text-center" style="color:var(--clr-muted);padding:16px">Tidak dapat memuat riwayat.</td></tr>`;
+  } catch (error) {
+    historyBody.innerHTML = `<tr><td colspan="7" class="text-center" style="color:var(--clr-muted);padding:16px">
+      <i class="bi bi-exclamation-circle me-1"></i>Tidak dapat memuat riwayat.</td></tr>`;
+    console.error('Evidence history load error:', error);
   }
 }
 
@@ -120,7 +209,7 @@ function renderEvidenceHistory() {
   }
   body.innerHTML = EV.storedEvidences.map((e, i) => `
     <tr>
-      <td style="font-size:11px;color:var(--clr-muted)">${String(e['TimeStamp']).substring(0,16)}</td>
+      <td style="font-size:11px;color:var(--clr-muted)">${String(e['TimeStamp'] || '').substring(0,16)}</td>
       <td><span class="no-hazard-code">${e['No Hazard'] || '—'}</span></td>
       <td>${e['Tanggal'] || '—'}</td>
       <td style="font-weight:600">${e['PIC'] || '—'}</td>
@@ -135,42 +224,97 @@ function renderEvidenceHistory() {
 }
 
 // ── File selection & drag-drop ─────────────────────────────────
-function handleFileSelect(files) {
+async function handleFileSelect(files) {
   const MAX = 10 * 1024 * 1024; // 10MB
-  Array.from(files).forEach(f => {
-    if (f.size > MAX) { toast(`File "${f.name}" terlalu besar (maks 10MB).`, 'error'); return; }
-    const reader = new FileReader();
-    reader.onload = e => {
-      EV.files.push({ name: f.name, size: f.size, type: f.type, dataUrl: e.target.result });
-      if (EV.selectedHazard) lsSaveFiles(EV.selectedHazard, EV.files);
-      renderFilePreview();
-    };
-    reader.readAsDataURL(f);
+  const filePromises = Array.from(files).map(f => {
+    return new Promise((resolve, reject) => {
+      if (f.size > MAX) {
+        toast(`File "${f.name}" terlalu besar (maks 10MB).`, 'error');
+        resolve(null);
+        return;
+      }
+      
+      // Validate file type
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'];
+      if (!allowedTypes.includes(f.type) && !f.type.startsWith('image/')) {
+        toast(`File "${f.name}" tidak didukung. Gunakan PNG, JPG, atau PDF.`, 'warning');
+        resolve(null);
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = e => resolve({
+        name: f.name,
+        size: f.size,
+        type: f.type,
+        dataUrl: e.target.result
+      });
+      reader.onerror = () => {
+        toast(`Gagal membaca file "${f.name}".`, 'error');
+        resolve(null);
+      };
+      reader.readAsDataURL(f);
+    });
   });
+  
+  showLoading('Memproses file...');
+  const results = await Promise.all(filePromises);
+  const newFiles = results.filter(f => f !== null);
+  
+  EV.files.push(...newFiles);
+  
+  if (EV.selectedHazard) {
+    try {
+      await idbSaveFiles(EV.selectedHazard, EV.files);
+    } catch (error) {
+      console.error('Failed to save to IndexedDB:', error);
+      toast('Gagal menyimpan file ke cache lokal. Beberapa file mungkin tidak tersimpan.', 'error');
+    }
+  }
+  
+  renderFilePreview();
+  hideLoading();
+  
+  if (newFiles.length > 0) {
+    toast(`${newFiles.length} file berhasil ditambahkan.`, 'success');
+  }
 }
 
-function removeEvidenceFile(idx) {
+async function removeEvidenceFile(idx) {
   EV.files.splice(idx, 1);
-  if (EV.selectedHazard) lsSaveFiles(EV.selectedHazard, EV.files);
+  if (EV.selectedHazard) {
+    try {
+      await idbSaveFiles(EV.selectedHazard, EV.files);
+    } catch (error) {
+      console.error('Failed to update IndexedDB:', error);
+    }
+  }
   renderFilePreview();
 }
 
 function renderFilePreview() {
   const list = document.getElementById('evidencePreviewList');
   if (!list) return;
-  if (!EV.files.length) { list.innerHTML = ''; return; }
+  if (!EV.files.length) { 
+    list.innerHTML = '<div style="padding:16px;text-align:center;color:var(--clr-muted);font-size:12px">Belum ada file dipilih.</div>'; 
+    return; 
+  }
 
-  list.innerHTML = EV.files.map((f, i) => {
-    const isImg = f.type.startsWith('image/');
+  const totalSize = EV.files.reduce((sum, f) => sum + (f.size || 0), 0);
+  const sizeInfo = totalSize > 0 ? `<div style="font-size:11px;color:var(--clr-muted);margin-bottom:8px">Total: ${EV.files.length} file · ${(totalSize/1024/1024).toFixed(2)} MB</div>` : '';
+
+  list.innerHTML = sizeInfo + EV.files.map((f, i) => {
+    const isImg = f.type && f.type.startsWith('image/');
     const thumb = isImg
-      ? `<img src="${f.dataUrl}" class="ev-thumb" alt="${f.name}" />`
+      ? `<img src="${f.dataUrl}" class="ev-thumb" alt="${f.name}" loading="lazy" />`
       : `<div class="ev-thumb ev-thumb-pdf"><i class="bi bi-file-earmark-pdf-fill"></i></div>`;
+    const fileSize = f.size ? `${(f.size/1024).toFixed(1)} KB` : 'Unknown';
     return `
       <div class="ev-file-item">
         ${thumb}
         <div class="ev-file-info">
           <span class="ev-file-name">${f.name}</span>
-          <span class="ev-file-size">${(f.size/1024).toFixed(1)} KB · ${isImg ? 'Gambar' : 'PDF'}</span>
+          <span class="ev-file-size">${fileSize} · ${isImg ? 'Gambar' : 'PDF'}</span>
         </div>
         <button class="ev-remove-btn" onclick="removeEvidenceFile(${i})" title="Hapus">
           <i class="bi bi-x"></i>
@@ -181,6 +325,11 @@ function renderFilePreview() {
 
 // ── Submit Evidence ────────────────────────────────────────────
 async function submitEvidence() {
+  if (EV.processing) {
+    toast('Sedang memproses evidence sebelumnya. Harap tunggu.', 'warning');
+    return;
+  }
+  
   if (!EV.selectedHazard) { toast('Pilih nomor hazard terlebih dahulu.', 'error'); return; }
 
   const tanggal      = document.getElementById('evTanggal').value;
@@ -190,9 +339,19 @@ async function submitEvidence() {
   const disetujui    = document.getElementById('evDisetujui').value.trim();
   const mengetahui   = document.getElementById('evMengetahui').value.trim();
 
-  if (!tanggal) { toast('Isi Tanggal Evidence terlebih dahulu.', 'error'); return; }
-  if (!pic)     { toast('Isi nama PIC terlebih dahulu.', 'error'); return; }
+  // Validation with specific messages
+  if (!tanggal) { toast('Isi Tanggal Evidence terlebih dahulu.', 'error'); document.getElementById('evTanggal').focus(); return; }
+  if (!pic)     { toast('Isi nama PIC terlebih dahulu.', 'error'); document.getElementById('evPIC').focus(); return; }
+  if (pic.length < 3) { toast('Nama PIC minimal 3 karakter.', 'warning'); document.getElementById('evPIC').focus(); return; }
 
+  EV.processing = true;
+  const submitBtn = document.querySelector('button[onclick="submitEvidence()"]');
+  const originalText = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="mini-spinner" style="width:14px;height:14px;border-color:rgba(255,255,255,0.3)"></span> Menyimpan...';
+  }
+  
   const data = {
     'No Hazard':      EV.selectedHazard,
     'Departemen':     STATE.dept,
@@ -209,21 +368,40 @@ async function submitEvidence() {
   try {
     const res = await submitEvidenceToGAS(data);
     if (res.ok) {
-      toast(res.msg, 'success');
-      // Files already saved to localStorage — no need to re-save
+      toast(res.msg || 'Evidence berhasil disimpan!', 'success');
+      // Ensure files are saved to IndexedDB
+      if (EV.files.length > 0) {
+        await idbSaveFiles(EV.selectedHazard, EV.files);
+      }
       await loadEvidenceHistory(EV.selectedHazard);
     } else {
-      toast(res.msg || 'Gagal menyimpan.', 'error');
+      toast(res.msg || 'Gagal menyimpan evidence.', 'error');
     }
-  } catch {
-    toast('Tidak dapat terhubung ke server.', 'error');
+  } catch (error) {
+    const errorMsg = handleApiError(error, 'Gagal menyimpan evidence');
+    toast(errorMsg, 'error');
+    console.error('Evidence submission error:', error);
+  } finally {
+    hideLoading();
+    EV.processing = false;
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = originalText;
+    }
   }
-  hideLoading();
 }
 
 function clearEvidence() {
+  if (EV.files.length > 0) {
+    if (!confirm('Anda yakin ingin menghapus semua file yang telah diupload? Data yang sudah tersimpan di Google Sheets tidak akan terhapus.')) {
+      return;
+    }
+  }
+  
   EV.files = [];
-  if (EV.selectedHazard) lsSaveFiles(EV.selectedHazard, []);
+  if (EV.selectedHazard) {
+    idbDeleteFiles(EV.selectedHazard).catch(console.error);
+  }
   document.getElementById('evidenceFileInput').value = '';
   document.getElementById('evCatatan').value   = '';
   document.getElementById('evTanggal').value   = '';
@@ -232,22 +410,39 @@ function clearEvidence() {
   document.getElementById('evDisetujui').value   = '';
   document.getElementById('evMengetahui').value  = '';
   renderFilePreview();
-  toast('Form evidence dikosongkan.', 'success');
+  toast('Form evidence dikosongkan.', 'info');
 }
 
 // ── Drag & Drop init ───────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const zone = document.getElementById('uploadZone');
   if (!zone) return;
-  zone.addEventListener('dragover',  e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', ()  => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
+  
+  zone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    zone.classList.remove('drag-over');
-    handleFileSelect(e.dataTransfer.files);
+    e.stopPropagation();
+    zone.classList.add('drag-over');
   });
-  zone.addEventListener('click', e => {
-    if (!e.target.closest('button')) document.getElementById('evidenceFileInput').click();
+  
+  zone.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag-over');
+  });
+  
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length > 0) {
+      handleFileSelect(e.dataTransfer.files);
+    }
+  });
+  
+  zone.addEventListener('click', (e) => {
+    if (!e.target.closest('button') && !e.target.closest('.ev-file-item') && !e.target.closest('.ev-remove-btn')) {
+      document.getElementById('evidenceFileInput').click();
+    }
   });
 });
 
@@ -257,15 +452,25 @@ document.addEventListener('DOMContentLoaded', () => {
 // ══════════════════════════════════════════════════════════════
 
 async function generatePDFReport(evIdx) {
-  // evIdx = index in EV.storedEvidences; if null = use current form values
+  if (EV.processing) {
+    toast('Sedang memproses laporan lain. Harap tunggu.', 'warning');
+    return;
+  }
+  
   let evData, noHazard, localFiles;
 
   if (typeof evIdx === 'number' && EV.storedEvidences[evIdx]) {
     evData    = EV.storedEvidences[evIdx];
     noHazard  = evData['No Hazard'];
-    localFiles = lsLoadFiles(noHazard);
+    showLoading('Memuat file dari cache lokal...');
+    try {
+      localFiles = await idbLoadFiles(noHazard);
+    } catch (error) {
+      localFiles = [];
+      console.error('Failed to load files for PDF:', error);
+    }
+    hideLoading();
   } else {
-    // Generate from current form
     noHazard = EV.selectedHazard;
     if (!noHazard) { toast('Pilih hazard terlebih dahulu.', 'error'); return; }
     evData = {
@@ -282,6 +487,8 @@ async function generatePDFReport(evIdx) {
   }
 
   const hazardRec = STATE.records.find(r => r['No Hazard'] === noHazard) || {};
+  
+  EV.processing = true;
   showLoading('Membuat PDF report...');
 
   try {
@@ -289,9 +496,8 @@ async function generatePDFReport(evIdx) {
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const PW = 210, PH = 297;
     const ML = 18, MR = 18, MT = 18;
-    const CW = PW - ML - MR; // content width
+    const CW = PW - ML - MR;
 
-    // ── Color palette ──
     const C = {
       teal:      [13,  148, 136],
       tealLight: [240, 253, 250],
@@ -314,13 +520,11 @@ async function generatePDFReport(evIdx) {
       return C.green;
     };
 
-    let y = MT; // cursor Y
+    let y = MT;
 
     // ─── HEADER BANNER ───────────────────────────────────────
     doc.setFillColor(...C.teal);
     doc.rect(0, 0, PW, 36, 'F');
-
-    // Accent stripe
     doc.setFillColor(10, 120, 110);
     doc.rect(0, 32, PW, 4, 'F');
 
@@ -332,7 +536,6 @@ async function generatePDFReport(evIdx) {
     doc.setFont('helvetica', 'normal');
     doc.text('Identifikasi Aspek Dampak Lingkungan & Kendali Risiko — Monokem', ML, 21);
 
-    // Report ID + date top-right
     doc.setFontSize(8);
     const printDate = new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' });
     doc.text(`Dicetak: ${printDate}`, PW - MR, 14, { align: 'right' });
@@ -340,7 +543,6 @@ async function generatePDFReport(evIdx) {
 
     y = 44;
 
-    // ─── SECTION: INFO HAZARD ──────────────────────────────
     const drawSectionTitle = (title, icon = '') => {
       doc.setFillColor(...C.tealLight);
       doc.setDrawColor(...C.tealBorder);
@@ -364,13 +566,11 @@ async function generatePDFReport(evIdx) {
       doc.setFontSize(9);
       doc.setTextColor(accent ? C.teal[0] : C.slate[0], accent ? C.teal[1] : C.slate[1], accent ? C.teal[2] : C.slate[2]);
       const val = String(value || '—');
-      const maxW = fw - 6;
-      doc.text(val, x + 3, row_y + 7, { maxWidth: maxW });
+      doc.text(val, x + 3, row_y + 7, { maxWidth: fw - 6 });
     };
 
     const drawRiskChip = (level, x, row_y) => {
       const col = riskColor(level);
-      doc.setFillColor(col[0], col[1], col[2], 0.1);
       doc.setFillColor(col[0] + 40 < 255 ? col[0] + 80 : 255, col[1] + 40 < 255 ? col[1] + 80 : 255, col[2] + 40 < 255 ? col[2] + 80 : 255);
       doc.setDrawColor(...col);
       doc.roundedRect(x, row_y + 1, 26, 7, 3, 3, 'FD');
@@ -384,7 +584,6 @@ async function generatePDFReport(evIdx) {
     doc.setFillColor(...C.white);
     doc.setDrawColor(...C.border);
     doc.roundedRect(ML, y, CW, 18, 3, 3, 'FD');
-    // Left accent bar
     doc.setFillColor(...C.teal);
     doc.roundedRect(ML, y, 4, 18, 2, 2, 'F');
 
@@ -397,10 +596,8 @@ async function generatePDFReport(evIdx) {
     doc.setTextColor(...C.muted);
     const aktShort = (hazardRec['Aktifitas'] || '').substring(0, 80);
     doc.text(aktShort, ML + 8, y + 13, { maxWidth: CW - 50 });
-    // Risk badge right
     const rLevel = hazardRec['Penilaian Risiko'] || '';
     drawRiskChip(rLevel, ML + CW - 32, y + 3);
-    // PxD
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...C.muted);
@@ -416,7 +613,6 @@ async function generatePDFReport(evIdx) {
     drawField('Departemen',  hazardRec['Departemen']  || STATE.dept || '—', ML + (HW4+2)*3, HW4, y);
     y += 13;
 
-    // Deskripsi row
     const HW2 = (CW - 4) / 2;
     const descHazard = hazardRec['Deskripsi Hazard'] || '—';
     const descDampak = hazardRec['Dampak'] || '—';
@@ -439,14 +635,12 @@ async function generatePDFReport(evIdx) {
     doc.text(descLines2, ML + HW2 + 7, y+8);
     y += descH + 4;
 
-    // Risk scores row
     drawField('Prob. Awal',    hazardRec['Nilai Probabilitas'] || '—',              ML,                HW4, y);
     drawField('Dampak Awal',   hazardRec['Nilai Dampak'] || '—',                    ML + HW4+2,        HW4, y);
     drawField('Prob. Akhir',   hazardRec['Nilai Pengendalian Probabilitas'] || '—', ML + (HW4+2)*2,    HW4, y);
     drawField('Dampak Akhir',  hazardRec['Nilai Penilaian Dampak'] || '—',          ML + (HW4+2)*3,    HW4, y);
     y += 13;
 
-    // Pengendalian
     const descKendali = hazardRec['Deskripsi Pengendalian'] || '—';
     const kendaliLines = doc.splitTextToSize(descKendali, CW - 6);
     const kendaliH = kendaliLines.length * 4 + 10;
@@ -458,7 +652,6 @@ async function generatePDFReport(evIdx) {
     doc.text(kendaliLines, ML+3, y+8);
     y += kendaliH + 6;
 
-    // ─── SECTION: EVIDENCE INFO ─────────────────────────────
     drawSectionTitle('Data Evidence');
     drawField('Tanggal',  evData['Tanggal'] || '—',      ML,           HW2,    y, false);
     drawField('PIC',      evData['PIC']     || '—',      ML + HW2 + 4, HW2,    y, false);
@@ -479,7 +672,6 @@ async function generatePDFReport(evIdx) {
     if (localFiles && localFiles.length > 0) {
       const imgFiles = localFiles.filter(f => f.type && f.type.startsWith('image/'));
       if (imgFiles.length > 0) {
-        // New page if not enough space
         if (y > PH - 80) { doc.addPage(); y = MT; }
         drawSectionTitle('Dokumentasi Foto Evidence');
 
@@ -492,18 +684,15 @@ async function generatePDFReport(evIdx) {
 
           const x = col === 0 ? ML : ML + imgW + 4;
 
-          // Image frame
           doc.setFillColor(...C.bgLight); doc.setDrawColor(...C.border);
           doc.roundedRect(x, y, imgW, imgH + 10, 2, 2, 'FD');
 
-          // Caption bar at top
           doc.setFillColor(...C.teal);
           doc.roundedRect(x, y, imgW, 7, 2, 2, 'F');
-          doc.rect(x, y + 4, imgW, 3, 'F'); // square bottom corners for top bar
+          doc.rect(x, y + 4, imgW, 3, 'F');
           doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...C.white);
           doc.text(`Foto ${i + 1}: ${imgFiles[i].name.substring(0,35)}`, x + 3, y + 5);
 
-          // Image
           try {
             doc.addImage(imgFiles[i].dataUrl, 'JPEG', x + 2, y + 9, imgW - 4, imgH - 2, undefined, 'MEDIUM');
           } catch(imgErr) {
@@ -514,10 +703,9 @@ async function generatePDFReport(evIdx) {
           col++;
           if (col >= 2) { col = 0; y += imgH + 14; }
         }
-        if (col === 1) y += imgH + 14; // flush last odd image
+        if (col === 1) y += imgH + 14;
         y += 4;
 
-        // Non-image files list
         const otherFiles = localFiles.filter(f => !f.type || !f.type.startsWith('image/'));
         if (otherFiles.length > 0) {
           if (y > PH - 40) { doc.addPage(); y = MT; }
@@ -533,7 +721,6 @@ async function generatePDFReport(evIdx) {
         }
       }
     } else {
-      // No files notice
       doc.setFillColor(254, 242, 242); doc.setDrawColor(254, 202, 202);
       doc.roundedRect(ML, y, CW, 10, 2, 2, 'FD');
       doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...C.muted);
@@ -559,26 +746,22 @@ async function generatePDFReport(evIdx) {
       doc.setFillColor(...C.bgLight); doc.setDrawColor(...C.border);
       doc.roundedRect(sx, y, sigW, sigH, 2, 2, 'FD');
 
-      // Top label bar
       doc.setFillColor(...C.tealLight); doc.setDrawColor(...C.tealBorder);
       doc.roundedRect(sx, y, sigW, 8, 2, 2, 'FD');
       doc.rect(sx, y + 5, sigW, 3, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...C.teal);
       doc.text(lbl, sx + sigW / 2, y + 5.5, { align: 'center' });
 
-      // Signature area
       doc.setDrawColor(...C.border);
       doc.setLineDash([2, 2]);
       doc.line(sx + 6, y + 28, sx + sigW - 6, y + 28);
       doc.setLineDash([]);
 
-      // Name
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...C.slate);
       doc.text(sigNames[i], sx + sigW / 2, y + 33, { align: 'center', maxWidth: sigW - 4 });
     });
     y += sigH + 6;
 
-    // Tanggal pengesahan
     doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...C.muted);
     doc.text(`Tanggal: ${evData['Tanggal'] || printDate}  |  Departemen: ${evData['Departemen'] || STATE.dept || '—'}`, ML, y);
     y += 6;
@@ -603,7 +786,9 @@ async function generatePDFReport(evIdx) {
     toast('PDF report berhasil dibuat!', 'success');
   } catch(err) {
     console.error('PDF error:', err);
-    toast('Gagal membuat PDF: ' + err.message, 'error');
+    toast('Gagal membuat PDF: ' + (err.message || 'Kesalahan tidak diketahui'), 'error');
+  } finally {
+    hideLoading();
+    EV.processing = false;
   }
-  hideLoading();
 }

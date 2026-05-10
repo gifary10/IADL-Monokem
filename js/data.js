@@ -2,6 +2,15 @@
 // data.js — Table Render, CRUD Operations, Filters
 // ============================================================
 
+// ── Debounce utility ────────────────────────────────────────
+let _debounceTimer = null;
+function debounce(func, delay = 300) {
+  return function(...args) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(() => func.apply(this, args), delay);
+  };
+}
+
 // ── Load Records from GAS ─────────────────────────────────────
 async function loadRecords() {
   showLoading('Memuat data risiko...');
@@ -11,14 +20,22 @@ async function loadRecords() {
       STATE.records = res.records;
       renderTable();
       updateStats();
+      // Trigger state change event
+      window.dispatchEvent(new CustomEvent('recordsUpdated', { detail: STATE.records }));
     } else {
-      toast(res.msg || 'Gagal memuat data.', 'error');
+      const errorMsg = handleApiError(null, res.msg || 'Gagal memuat data.');
+      toast(errorMsg, 'error');
     }
   } catch (e) {
-    toast('Tidak dapat terhubung ke server.', 'error');
+    const errorMsg = handleApiError(e, 'Gagal memuat data dari server.');
+    toast(errorMsg, 'error');
+    console.error('Load records error:', e);
   }
   hideLoading();
 }
+
+// ── Debounced search handler ──────────────────────────────────
+const debouncedRenderTable = debounce(() => renderTable(), 300);
 
 // ── Render Table ──────────────────────────────────────────────
 function renderTable() {
@@ -29,23 +46,34 @@ function renderTable() {
   const filtered = STATE.records.filter(r => {
     const match    = !q || [r['Aktifitas'], r['Lokasi'], r['Deskripsi Hazard'], r['No Hazard']]
       .some(v => String(v || '').toLowerCase().includes(q));
-    const riskMatch = !fRisk || (r['Penilaian Risiko'] || '').includes(fRisk);
+    const riskMatch = !fRisk || (r['Penilaian Risiko'] || '') === fRisk;
     const kondMatch = !fKond || r['Kondisi'] === fKond;
     return match && riskMatch && kondMatch;
   });
 
   const countEl = document.getElementById('recordCount');
-  if (countEl) countEl.textContent = `${filtered.length} entri`;
+  if (countEl) {
+    countEl.textContent = `${filtered.length} entri`;
+    if (q || fRisk || fKond) {
+      countEl.textContent += ` (difilter dari ${STATE.records.length})`;
+    }
+  }
 
   const tbody = document.getElementById('tableBody');
   if (!tbody) return;
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="21"><div class="empty-state"><i class="bi bi-inbox"></i><p>Tidak ada data ditemukan.</p></div></td></tr>`;
+    const msg = STATE.records.length === 0 
+      ? 'Belum ada data. Klik "Input Data Baru" untuk memulai.'
+      : 'Tidak ada data ditemukan dengan filter yang dipilih.';
+    tbody.innerHTML = `<tr><td colspan="21"><div class="empty-state"><i class="bi bi-inbox"></i><p>${msg}</p></div></td></tr>`;
     return;
   }
 
-  const trunc = (val, len = 80) => { const s = String(val || '—'); return s.length > len ? s.substring(0, len) + '…' : s; };
+  const trunc = (val, len = 80) => { 
+    const s = String(val || '—'); 
+    return s.length > len ? s.substring(0, len) + '…' : s; 
+  };
 
   // Use DocumentFragment for performance
   const frag = document.createDocumentFragment();
@@ -96,7 +124,10 @@ function renderTable() {
 // ── Delete Flow ───────────────────────────────────────────────
 function deleteRecord(idx) {
   const rec = STATE.records[idx];
-  if (!rec) return;
+  if (!rec) {
+    toast('Data tidak ditemukan.', 'error');
+    return;
+  }
   STATE.deleteRowNum   = rec._row;
   STATE.deleteHazardNo = rec['No Hazard'];
   document.getElementById('deleteHazardNo').textContent = rec['No Hazard'];
@@ -104,40 +135,71 @@ function deleteRecord(idx) {
 }
 
 async function confirmDelete() {
-  bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide();
+  const modalEl = document.getElementById('deleteModal');
+  const modal = bootstrap.Modal.getInstance(modalEl);
+  if (modal) modal.hide();
+  
   showLoading('Menghapus data...');
   try {
     const res = await removeRecord(STATE.deleteRowNum);
     if (res.ok) {
-      toast(res.msg, 'success');
+      toast(res.msg || 'Data berhasil dihapus.', 'success');
       await loadRecords();
     } else {
-      toast(res.msg || 'Gagal menghapus.', 'error');
+      toast(res.msg || 'Gagal menghapus data.', 'error');
     }
   } catch (e) {
-    toast('Tidak dapat terhubung ke server.', 'error');
+    const errorMsg = handleApiError(e, 'Gagal menghapus data dari server.');
+    toast(errorMsg, 'error');
+    console.error('Delete error:', e);
   }
   hideLoading();
 }
 
 // ── Export CSV ────────────────────────────────────────────────
 function exportCSV() {
-  if (!STATE.records.length) { toast('Tidak ada data untuk diekspor.', 'warning'); return; }
+  if (!STATE.records.length) { 
+    toast('Tidak ada data untuk diekspor.', 'warning'); 
+    return; 
+  }
 
-  const headers = ['TimeStamp','Departemen','Aktifitas','Lokasi','Kondisi','No Hazard',
-    'Klasifikasi Resiko','Deskripsi Hazard','Dampak','Nilai Probabilitas','Nilai Dampak',
-    'PxD Awal','Penilaian Risiko','Pengendalian Risiko','Deskripsi Pengendalian',
-    'Nilai Pengendalian Probabilitas','Nilai Penilaian Dampak','PxD Akhir','Risiko Setelah Pengendalian'];
+  try {
+    const headers = ['TimeStamp','Departemen','Aktifitas','Lokasi','Kondisi','No Hazard',
+      'Klasifikasi Resiko','Deskripsi Hazard','Dampak','Nilai Probabilitas','Nilai Dampak',
+      'PxD Awal','Penilaian Risiko','Pengendalian Risiko','Deskripsi Pengendalian',
+      'Nilai Pengendalian Probabilitas','Nilai Penilaian Dampak','PxD Akhir','Risiko Setelah Pengendalian'];
 
-  const esc = v => `"${String(v || '').replace(/"/g, '""')}"`;
-  const rows = STATE.records.map(r => headers.map(h => esc(r[h])).join(','));
-  const csv  = [headers.map(esc).join(','), ...rows].join('\n');
+    const esc = v => `"${String(v || '').replace(/"/g, '""')}"`;
+    const rows = STATE.records.map(r => headers.map(h => esc(r[h])).join(','));
+    const csv  = [headers.map(esc).join(','), ...rows].join('\n');
 
-  const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = `IADL_${STATE.dept}_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast('Data berhasil diekspor ke CSV.', 'success');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; 
+    a.download = `IADL_${STATE.dept}_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Data berhasil diekspor ke CSV.', 'success');
+  } catch (e) {
+    console.error('Export CSV error:', e);
+    toast('Gagal mengekspor data ke CSV.', 'error');
+  }
 }
+
+// ── Init search listeners ─────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    // Replace existing oninput with debounced version
+    searchInput.removeAttribute('oninput');
+    searchInput.addEventListener('input', debouncedRenderTable);
+  }
+  
+  const filterRisk = document.getElementById('filterRisk');
+  const filterKond = document.getElementById('filterKondisi');
+  if (filterRisk) filterRisk.addEventListener('change', renderTable);
+  if (filterKond) filterKond.addEventListener('change', renderTable);
+});

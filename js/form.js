@@ -1,6 +1,154 @@
 // ============================================================
-// form.js — Form Input, Validation, Risk Calc, Hints
+// form.js — Form Input, Validation, Risk Calc, Hints, Autosave
 // ============================================================
+
+// ── Autosave Configuration ──────────────────────────────────
+const AUTOSAVE_KEY = 'iadl_form_autosave';
+const AUTOSAVE_INTERVAL = 15000; // 15 seconds
+let _autosaveTimer = null;
+let _autosaveEnabled = true;
+
+// ── Autosave Functions ──────────────────────────────────────
+function saveFormToStorage() {
+  if (!_autosaveEnabled) return;
+  
+  const formData = {
+    timestamp: new Date().toISOString(),
+    dept: STATE.dept,
+    isEdit: STATE.editMode,
+    fields: {}
+  };
+  
+  // Collect all form field values
+  const fieldIds = [
+    'f_row', 'f_noHazard', 'f_aktifitas', 'f_lokasi', 'f_kondisi',
+    'f_klasifikasi', 'f_descHazard', 'f_dampak', 'f_prob', 'f_dampakVal',
+    'f_pxdAwal', 'f_riskAwal', 'f_pengendalian', 'f_descPengendalian',
+    'f_ctrlProb', 'f_ctrlDampak', 'f_pxdAkhir', 'f_riskAkhir'
+  ];
+  
+  fieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      formData.fields[id] = el.value || '';
+    }
+  });
+  
+  try {
+    sessionStorage.setItem(AUTOSAVE_KEY, JSON.stringify(formData));
+  } catch (e) {
+    console.warn('Autosave: sessionStorage full or unavailable', e);
+  }
+}
+
+function loadFormFromStorage() {
+  try {
+    const saved = sessionStorage.getItem(AUTOSAVE_KEY);
+    if (!saved) return false;
+    
+    const formData = JSON.parse(saved);
+    
+    // Check if autosave is from current department
+    if (formData.dept !== STATE.dept) {
+      sessionStorage.removeItem(AUTOSAVE_KEY);
+      return false;
+    }
+    
+    // Check if autosave is less than 2 hours old
+    const savedTime = new Date(formData.timestamp);
+    const now = new Date();
+    const hoursDiff = (now - savedTime) / (1000 * 60 * 60);
+    
+    if (hoursDiff > 2) {
+      sessionStorage.removeItem(AUTOSAVE_KEY);
+      return false;
+    }
+    
+    return formData;
+  } catch (e) {
+    console.warn('Autosave: failed to load', e);
+    sessionStorage.removeItem(AUTOSAVE_KEY);
+    return false;
+  }
+}
+
+function clearAutosave() {
+  sessionStorage.removeItem(AUTOSAVE_KEY);
+  if (_autosaveTimer) {
+    clearInterval(_autosaveTimer);
+    _autosaveTimer = null;
+  }
+}
+
+function startAutosave() {
+  clearAutosave();
+  _autosaveEnabled = true;
+  _autosaveTimer = setInterval(saveFormToStorage, AUTOSAVE_INTERVAL);
+  
+  // Also save on form field changes (debounced)
+  const form = document.getElementById('dataForm');
+  if (form) {
+    const debouncedSave = debounce(saveFormToStorage, 2000);
+    form.querySelectorAll('input, select, textarea').forEach(el => {
+      el.addEventListener('change', debouncedSave);
+      el.addEventListener('input', debouncedSave);
+    });
+  }
+}
+
+async function restoreAutosave() {
+  const savedData = loadFormFromStorage();
+  if (!savedData || !savedData.fields) return;
+  
+  // Check if there are actual values saved
+  const hasValues = Object.values(savedData.fields).some(v => v && v.length > 0);
+  if (!hasValues) {
+    sessionStorage.removeItem(AUTOSAVE_KEY);
+    return;
+  }
+  
+  const confirmed = await confirmDialog(
+    `Ditemukan data formulir yang belum tersimpan dari sesi sebelumnya (${new Date(savedData.timestamp).toLocaleTimeString('id-ID')}). Ingin melanjutkan mengisi?`,
+    'Pulihkan Formulir'
+  );
+  
+  if (confirmed) {
+    // Restore form fields
+    Object.entries(savedData.fields).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el && value) {
+        if (el.tagName === 'SELECT') {
+          el.value = value;
+        } else {
+          el.value = value;
+        }
+      }
+    });
+    
+    // Restore edit mode
+    if (savedData.isEdit) {
+      STATE.editMode = true;
+      document.getElementById('btnSubmitLabel').textContent = 'Perbarui Data';
+    }
+    
+    // Recalculate risk
+    calcRisk();
+    calcRiskAfter();
+    
+    // Show hints for selects
+    ['f_kondisi', 'f_klasifikasi', 'f_prob', 'f_dampakVal', 'f_pengendalian', 'f_ctrlProb', 'f_ctrlDampak'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value) {
+        const hintKey = id.replace('f_', '') + '_val';
+        showSelectHint(hintKey, el.value);
+      }
+    });
+    
+    toast('Formulir berhasil dipulihkan.', 'info');
+  } else {
+    sessionStorage.removeItem(AUTOSAVE_KEY);
+  }
+}
 
 // ── Risk Calculation ──────────────────────────────────────────
 function calcRisk() {
@@ -54,6 +202,7 @@ function resetForm() {
   document.getElementById('previewRiskAkhir').textContent = '—';
   document.getElementById('btnSubmitLabel').textContent   = 'Simpan Data';
   STATE.editMode = false;
+  clearAutosave();
 
   // Hide all hint panels
   ['kondisi_val','klasifikasi_val','prob_val','dampak_val',
@@ -63,6 +212,9 @@ function resetForm() {
   });
   const badge = document.getElementById('riskReductionBadge');
   if (badge) badge.style.display = 'none';
+  
+  // Restart autosave for new form
+  startAutosave();
 }
 
 // ── Open Form (new entry) ─────────────────────────────────────
@@ -73,15 +225,44 @@ async function openNewForm() {
   try {
     const res = await fetchLastNo();
     document.getElementById('f_noHazard').value = res.ok ? res.next : 'IADL0001';
-  } catch { document.getElementById('f_noHazard').value = 'IADL0001'; }
+  } catch (e) { 
+    document.getElementById('f_noHazard').value = 'IADL0001';
+    console.error('Failed to fetch last no:', e);
+  }
   hideLoading();
   STATE.editMode = false;
   document.getElementById('btnSubmitLabel').textContent = 'Simpan Data';
+  startAutosave();
 }
 
 // ── Submit / Update ───────────────────────────────────────────
 async function submitForm(e) {
   e.preventDefault();
+
+  // Basic validation
+  const requiredFields = {
+    'f_aktifitas': 'Aktifitas',
+    'f_lokasi': 'Lokasi',
+    'f_kondisi': 'Kondisi',
+    'f_klasifikasi': 'Klasifikasi Dampak',
+    'f_descHazard': 'Deskripsi Aspek',
+    'f_dampak': 'Dampak',
+    'f_prob': 'Nilai Probabilitas',
+    'f_dampakVal': 'Nilai Dampak',
+    'f_pengendalian': 'Pengendalian Risiko',
+    'f_descPengendalian': 'Deskripsi Pengendalian',
+    'f_ctrlProb': 'Probabilitas Setelah Kendali',
+    'f_ctrlDampak': 'Dampak Setelah Kendali'
+  };
+  
+  for (const [id, label] of Object.entries(requiredFields)) {
+    const el = document.getElementById(id);
+    if (el && !el.value) {
+      toast(`Field "${label}" harus diisi.`, 'error');
+      el.focus();
+      return;
+    }
+  }
 
   const ts   = new Date().toLocaleString('id-ID');
   const data = {
@@ -113,15 +294,18 @@ async function submitForm(e) {
   try {
     const res = await saveRecord(data, !!rowNum);
     if (res.ok) {
-      toast(res.msg, 'success');
+      toast(res.msg || 'Data berhasil disimpan!', 'success');
+      clearAutosave();
       resetForm();
       await loadRecords();
       switchTab('data');
     } else {
-      toast(res.msg || 'Gagal menyimpan.', 'error');
+      toast(res.msg || 'Gagal menyimpan data.', 'error');
     }
   } catch (e) {
-    toast('Tidak dapat terhubung ke server.', 'error');
+    const errorMsg = handleApiError(e, 'Gagal menyimpan data ke server.');
+    toast(errorMsg, 'error');
+    console.error('Form submission error:', e);
   }
   hideLoading();
 }
@@ -129,9 +313,13 @@ async function submitForm(e) {
 // ── Edit Record (load into form) ──────────────────────────────
 function editRecord(idx) {
   const rec = STATE.records[idx];
-  if (!rec) return;
+  if (!rec) {
+    toast('Data tidak ditemukan.', 'error');
+    return;
+  }
 
   switchTab('form');
+  clearAutosave();
 
   document.getElementById('f_row').value               = rec._row;
   document.getElementById('f_noHazard').value          = rec['No Hazard'] || '';
@@ -141,7 +329,10 @@ function editRecord(idx) {
   document.getElementById('f_dampak').value            = rec['Dampak'] || '';
   document.getElementById('f_descPengendalian').value  = rec['Deskripsi Pengendalian'] || '';
 
-  const setSelect = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  const setSelect = (id, val) => { 
+    const el = document.getElementById(id); 
+    if (el) el.value = val || ''; 
+  };
   setSelect('f_kondisi',      rec['Kondisi']);
   setSelect('f_klasifikasi',  rec['Klasifikasi Resiko']);
   setSelect('f_prob',         rec['Nilai Probabilitas']);
@@ -163,6 +354,7 @@ function editRecord(idx) {
 
   document.getElementById('btnSubmitLabel').textContent = 'Perbarui Data';
   STATE.editMode = true;
+  startAutosave();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -195,6 +387,7 @@ const SELECT_HINTS = {
     '5': { color: '#f87171', bg: 'rgba(239,68,68,0.07)',  icon: 'bi-5-square', text: 'Katastrofik — Kerusakan permanen dan luas. Sanksi hukum berat, tuntutan pidana.' }
   }
 };
+
 SELECT_HINTS.ctrl_prob_val   = SELECT_HINTS.prob_val;
 SELECT_HINTS.ctrl_dampak_val = SELECT_HINTS.dampak_val;
 SELECT_HINTS.pengendalian_val = {
@@ -209,7 +402,8 @@ function showSelectHint(key, value) {
   const panel = document.getElementById(key + '_hint');
   if (!panel) return;
   if (!value || !SELECT_HINTS[key] || !SELECT_HINTS[key][value]) {
-    panel.style.display = 'none'; return;
+    panel.style.display = 'none'; 
+    return;
   }
   const h = SELECT_HINTS[key][value];
   panel.style.display = 'block';
@@ -220,3 +414,46 @@ function showSelectHint(key, value) {
     <div style="font-size:12px;color:var(--clr-muted);line-height:1.55">${h.text}</div>
   </div>`;
 }
+
+// ── Form Autosave Init ────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Start autosave when form tab is active
+  const observer = new MutationObserver(() => {
+    const formPanel = document.getElementById('tab-form');
+    if (formPanel && formPanel.classList.contains('active')) {
+      startAutosave();
+      restoreAutosave();
+    } else {
+      clearAutosave();
+    }
+  });
+  
+  const formPanel = document.getElementById('tab-form');
+  if (formPanel) {
+    observer.observe(formPanel, { attributes: true, attributeFilter: ['class'] });
+  }
+  
+  // Initial check if form is active
+  if (formPanel && formPanel.classList.contains('active')) {
+    startAutosave();
+    restoreAutosave();
+  }
+  
+  // Warn before leaving page if form has data
+  window.addEventListener('beforeunload', (e) => {
+    const form = document.getElementById('dataForm');
+    if (form && STATE.activeTab === 'form') {
+      const hasData = Array.from(form.elements).some(el => {
+        if (el.type === 'submit' || el.type === 'button' || el.id === 'f_noHazard' || el.id === 'f_row') return false;
+        return el.value && el.value.length > 0;
+      });
+      
+      if (hasData) {
+        saveFormToStorage();
+        e.preventDefault();
+        e.returnValue = 'Anda memiliki data yang belum disimpan. Yakin ingin meninggalkan halaman?';
+        return e.returnValue;
+      }
+    }
+  });
+});
