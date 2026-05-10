@@ -1,8 +1,3 @@
-/* ============================================================
-   style.css — IADL Monokem Main Stylesheet
-   ============================================================ */
-
-/* ── Design Tokens ────────────────────────────────────────── */
 :root {
   --clr-bg:       #f8fafc;
   --clr-surface:  #ffffff;
@@ -27,9 +22,9 @@
   --shadow-card: 0 4px 12px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
   --shadow-glow: 0 8px 24px -8px rgba(13,148,136,0.15);
 
-  --font-body: 'Roboto', system-ui, sans-serif;
-  --font-mono: 'Roboto Mono', 'Courier New', monospace;
-  --font-display: 'Roboto', var(--font-body);
+--font-body: 'Inter', system-ui, sans-serif;
+--font-mono: 'Inter', 'Courier New', monospace;
+--font-display: 'Inter', var(--font-body);
 }
 
 /* ── Base Reset ───────────────────────────────────────────── */
